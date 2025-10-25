@@ -1,0 +1,424 @@
+const User = require("../models/User");
+const Idea = require("../models/Idea");
+const Evaluation = require("../models/Evaluation");
+const emailService = require("../services/emailService");
+
+// Get all users
+exports.getAllUsers = async (req, res, next) => {
+  try {
+    const { page = 1, limit = 20, role, search } = req.query;
+
+    const query = {};
+
+    if (role) {
+      query.roles = role;
+    }
+
+    if (search) {
+      query.$or = [
+        { email: { $regex: search, $options: "i" } },
+        { fullName: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    const users = await User.find(query)
+      .select("-password")
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .sort({ createdAt: -1 });
+
+    const count = await User.countDocuments(query);
+
+    res.json({
+      users,
+      totalPages: Math.ceil(count / limit),
+      currentPage: page,
+      total: count,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Get user by ID
+exports.getUserById = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.params.id).select("-password");
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Get user's ideas if founder
+    let ideas = [];
+    if (user.roles.includes("founder")) {
+      ideas = await Idea.find({ founderId: user._id });
+    }
+
+    // Get user's evaluations if evaluator
+    let evaluations = [];
+    if (user.roles.includes("evaluator")) {
+      evaluations = await Evaluation.find({ evaluatorId: user._id }).populate(
+        "ideaId",
+        "title"
+      );
+    }
+
+    res.json({ user, ideas, evaluations });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Assign/update user roles
+exports.updateUserRoles = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { roles } = req.body;
+
+    // Validate roles
+    const validRoles = ["basic", "founder", "evaluator", "admin"];
+    const invalidRoles = roles.filter((role) => !validRoles.includes(role));
+
+    if (invalidRoles.length > 0) {
+      return res.status(400).json({
+        error: `Invalid roles: ${invalidRoles.join(", ")}`,
+      });
+    }
+
+    // Ensure basic role is always included
+    if (!roles.includes("basic")) {
+      roles.push("basic");
+    }
+
+    const user = await User.findById(id);
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Prevent removing admin role from the last admin
+    if (user.roles.includes("admin") && !roles.includes("admin")) {
+      const adminCount = await User.countDocuments({ roles: "admin" });
+      if (adminCount <= 1) {
+        return res.status(400).json({
+          error: "Cannot remove admin role from the last admin user",
+        });
+      }
+    }
+
+    user.roles = roles;
+    await user.save();
+
+    // Send notification email
+    await emailService.sendRoleAssignedEmail(user.email, user.fullName, roles);
+
+    res.json({
+      message: "User roles updated successfully",
+      user: {
+        id: user._id,
+        email: user.email,
+        fullName: user.fullName,
+        roles: user.roles,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Get all ideas with filters
+exports.getAllIdeas = async (req, res, next) => {
+  try {
+    const { page = 1, limit = 20, status, search } = req.query;
+
+    const query = {};
+
+    if (status) {
+      query.status = status;
+    }
+
+    if (search) {
+      query.$or = [
+        { title: { $regex: search, $options: "i" } },
+        { abstract: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    const ideas = await Idea.find(query)
+      .populate("founderId", "fullName email")
+      .populate("assignedEvaluators", "fullName email")
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .sort({ createdAt: -1 });
+
+    const count = await Idea.countDocuments(query);
+
+    res.json({
+      ideas,
+      totalPages: Math.ceil(count / limit),
+      currentPage: page,
+      total: count,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Update idea status
+exports.updateIdeaStatus = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    const validStatuses = [
+      "draft",
+      "submitted",
+      "under_review",
+      "approved",
+      "rejected",
+    ];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ error: "Invalid status" });
+    }
+
+    const idea = await Idea.findById(id).populate("founderId");
+
+    if (!idea) {
+      return res.status(404).json({ error: "Idea not found" });
+    }
+
+    const oldStatus = idea.status;
+    idea.status = status;
+    await idea.save();
+
+    // Send notification if status changed significantly
+    if (
+      ["under_review", "approved", "rejected"].includes(status) &&
+      oldStatus !== status
+    ) {
+      await emailService.sendIdeaStatusChangedEmail(
+        idea.founderId.email,
+        idea.founderId.fullName,
+        idea.title,
+        status
+      );
+    }
+
+    res.json({ message: "Idea status updated successfully", idea });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Assign evaluators to idea
+exports.assignEvaluators = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { evaluatorIds } = req.body;
+
+    const idea = await Idea.findById(id);
+
+    if (!idea) {
+      return res.status(404).json({ error: "Idea not found" });
+    }
+
+    // Verify all evaluators exist and have evaluator role
+    const evaluators = await User.find({
+      _id: { $in: evaluatorIds },
+      roles: "evaluator",
+    });
+
+    if (evaluators.length !== evaluatorIds.length) {
+      return res.status(400).json({
+        error:
+          "One or more invalid evaluator IDs or users without evaluator role",
+      });
+    }
+
+    // Update idea
+    idea.assignedEvaluators = evaluatorIds;
+    if (idea.status === "submitted") {
+      idea.status = "under_review";
+    }
+    await idea.save();
+
+    // Create evaluation records for new evaluators
+    for (const evaluatorId of evaluatorIds) {
+      const existingEvaluation = await Evaluation.findOne({
+        ideaId: id,
+        evaluatorId,
+      });
+
+      if (!existingEvaluation) {
+        await Evaluation.create({
+          ideaId: id,
+          evaluatorId,
+          status: "pending",
+        });
+
+        // Send notification email
+        const evaluator = evaluators.find(
+          (e) => e._id.toString() === evaluatorId
+        );
+        await emailService.sendIdeaAssignedEmail(
+          evaluator.email,
+          evaluator.fullName,
+          idea.title,
+          idea._id
+        );
+      }
+    }
+
+    res.json({
+      message: "Evaluators assigned successfully",
+      idea: await Idea.findById(id).populate(
+        "assignedEvaluators",
+        "fullName email"
+      ),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Get dashboard statistics
+exports.getDashboardStats = async (req, res, next) => {
+  try {
+    const stats = {
+      users: {
+        total: await User.countDocuments(),
+        basic: await User.countDocuments({ roles: "basic" }),
+        founders: await User.countDocuments({ roles: "founder" }),
+        evaluators: await User.countDocuments({ roles: "evaluator" }),
+        admins: await User.countDocuments({ roles: "admin" }),
+        verified: await User.countDocuments({ isVerified: true }),
+      },
+      ideas: {
+        total: await Idea.countDocuments(),
+        draft: await Idea.countDocuments({ status: "draft" }),
+        submitted: await Idea.countDocuments({ status: "submitted" }),
+        underReview: await Idea.countDocuments({ status: "under_review" }),
+        approved: await Idea.countDocuments({ status: "approved" }),
+        rejected: await Idea.countDocuments({ status: "rejected" }),
+      },
+      evaluations: {
+        total: await Evaluation.countDocuments(),
+        pending: await Evaluation.countDocuments({ status: "pending" }),
+        completed: await Evaluation.countDocuments({ status: "completed" }),
+      },
+    };
+
+    // Recent activity
+    const recentIdeas = await Idea.find()
+      .populate("founderId", "fullName email")
+      .sort({ createdAt: -1 })
+      .limit(5);
+
+    const recentEvaluations = await Evaluation.find({ status: "completed" })
+      .populate("evaluatorId", "fullName")
+      .populate("ideaId", "title")
+      .sort({ submittedAt: -1 })
+      .limit(5);
+
+    res.json({
+      stats,
+      recentIdeas,
+      recentEvaluations,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Export ideas data
+exports.exportIdeas = async (req, res, next) => {
+  try {
+    const ideas = await Idea.find()
+      .populate("founderId", "fullName email")
+      .populate("assignedEvaluators", "fullName email");
+
+    // Transform data for export
+    const exportData = ideas.map((idea) => ({
+      id: idea._id,
+      title: idea.title,
+      founder: idea.founderId.fullName,
+      founderEmail: idea.founderId.email,
+      status: idea.status,
+      submittedAt: idea.submittedAt,
+      evaluatorCount: idea.assignedEvaluators.length,
+      averageScore: idea.averageScore || "N/A",
+      createdAt: idea.createdAt,
+    }));
+
+    res.json({ data: exportData });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Export evaluations data
+exports.exportEvaluations = async (req, res, next) => {
+  try {
+    const evaluations = await Evaluation.find({ status: "completed" })
+      .populate("evaluatorId", "fullName email")
+      .populate("ideaId", "title founderId")
+      .populate({
+        path: "ideaId",
+        populate: { path: "founderId", select: "fullName email" },
+      });
+
+    // Transform data for export
+    const exportData = evaluations.map((evaluation) => ({
+      id: evaluation._id,
+      ideaTitle: evaluation.ideaId.title,
+      founder: evaluation.ideaId.founderId.fullName,
+      evaluator: evaluation.evaluatorId.fullName,
+      innovationScore: evaluation.scores.innovation,
+      feasibilityScore: evaluation.scores.feasibility,
+      impactScore: evaluation.scores.impact,
+      presentationScore: evaluation.scores.presentation,
+      totalScore: evaluation.totalScore,
+      averageScore: evaluation.averageScore,
+      comments: evaluation.comments,
+      submittedAt: evaluation.submittedAt,
+    }));
+
+    res.json({ data: exportData });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Delete user (admin only - use with caution)
+exports.deleteUser = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const user = await User.findById(id);
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Prevent deleting the last admin
+    if (user.roles.includes("admin")) {
+      const adminCount = await User.countDocuments({ roles: "admin" });
+      if (adminCount <= 1) {
+        return res.status(400).json({
+          error: "Cannot delete the last admin user",
+        });
+      }
+    }
+
+    // Delete associated data
+    await Idea.deleteMany({ founderId: id });
+    await Evaluation.deleteMany({ evaluatorId: id });
+
+    await User.findByIdAndDelete(id);
+
+    res.json({ message: "User and associated data deleted successfully" });
+  } catch (error) {
+    next(error);
+  }
+};
