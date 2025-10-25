@@ -1,37 +1,36 @@
-const SibApiV3Sdk = require('sib-api-v3-sdk');
-
-// Configure Brevo API
-const defaultClient = SibApiV3Sdk.ApiClient.instance;
-const apiKey = defaultClient.authentications['api-key'];
-apiKey.apiKey = process.env.BREVO_API_KEY;
-
-const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
+const { emailConfig } = require("../config/email");
 
 // Helper function to send email
 const sendEmail = async (to, subject, htmlContent) => {
-  const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
+  if (!emailConfig.transporter) {
+    console.warn(
+      "⚠️  Email transporter not configured. Skipping email to:",
+      to
+    );
+    return false;
+  }
 
-  sendSmtpEmail.sender = {
-    name: process.env.BREVO_SENDER_NAME || 'mAIple Conference',
-    email: process.env.BREVO_SENDER_EMAIL
+  const mailOptions = {
+    from: `"${emailConfig.sender.name}" <${emailConfig.sender.email}>`,
+    to: to,
+    subject: subject,
+    html: htmlContent,
   };
-  sendSmtpEmail.to = [{ email: to }];
-  sendSmtpEmail.subject = subject;
-  sendSmtpEmail.htmlContent = htmlContent;
 
   try {
-    await apiInstance.sendTransacEmail(sendSmtpEmail);
+    const info = await emailConfig.transporter.sendMail(mailOptions);
     console.log(`✅ Email sent to ${to}: ${subject}`);
+    console.log("   Message ID:", info.messageId);
     return true;
   } catch (error) {
-    console.error('❌ Email send error:', error);
+    console.error("❌ Email send error:", error.message);
     return false;
   }
 };
 
 // Welcome email
 exports.sendWelcomeEmail = async (email, fullName) => {
-  const subject = 'Welcome to mAIple AI Conference!';
+  const subject = "Welcome to mAIple AI Conference!";
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <h1 style="color: #ff6b35;">Welcome to mAIple! 🍁</h1>
@@ -44,7 +43,7 @@ exports.sendWelcomeEmail = async (email, fullName) => {
         <li><strong>Evaluators:</strong> Review and score innovative submissions</li>
         <li><strong>Attendees:</strong> Stay updated with conference news and schedule</li>
       </ul>
-      <p>Visit your dashboard to get started: <a href="${process.env.FRONTEND_URL}/dashboard">Dashboard</a></p>
+      <p>Visit your dashboard to get started: <a href="${emailConfig.frontendUrl}/dashboard">Dashboard</a></p>
       <p>Best regards,<br>The mAIple Team</p>
     </div>
   `;
@@ -53,8 +52,8 @@ exports.sendWelcomeEmail = async (email, fullName) => {
 
 // Email verification
 exports.sendVerificationEmail = async (email, fullName, token) => {
-  const verificationUrl = `${process.env.FRONTEND_URL}/verify-email/${token}`;
-  const subject = 'Verify Your Email - mAIple Conference';
+  const verificationUrl = `${emailConfig.frontendUrl}/verify-email/${token}`;
+  const subject = "Verify Your Email - mAIple Conference";
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <h1 style="color: #ff6b35;">Verify Your Email 📧</h1>
@@ -83,8 +82,8 @@ exports.sendVerificationEmail = async (email, fullName, token) => {
 
 // Password reset
 exports.sendPasswordResetEmail = async (email, fullName, token) => {
-  const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${token}`;
-  const subject = 'Reset Your Password - mAIple Conference';
+  const resetUrl = `${emailConfig.frontendUrl}/reset-password/${token}`;
+  const subject = "Reset Your Password - mAIple Conference";
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <h1 style="color: #ff6b35;">Reset Your Password 🔒</h1>
@@ -113,7 +112,7 @@ exports.sendPasswordResetEmail = async (email, fullName, token) => {
 
 // Idea submission confirmation
 exports.sendIdeaSubmittedEmail = async (email, fullName, ideaTitle) => {
-  const subject = 'Idea Submitted Successfully!';
+  const subject = "Idea Submitted Successfully!";
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <h1 style="color: #ff6b35;">Idea Submitted! 💡</h1>
@@ -125,7 +124,7 @@ exports.sendIdeaSubmittedEmail = async (email, fullName, ideaTitle) => {
         <li>You'll receive feedback and scores within 5-7 business days</li>
         <li>Top ideas will be selected for the pitch competition</li>
       </ol>
-      <p>You can track your submission status in your dashboard: <a href="${process.env.FRONTEND_URL}/dashboard">View Dashboard</a></p>
+      <p>You can track your submission status in your dashboard: <a href="${emailConfig.frontendUrl}/dashboard">View Dashboard</a></p>
       <p>Good luck! 🌟</p>
       <p>Best regards,<br>The mAIple Team</p>
     </div>
@@ -135,8 +134,8 @@ exports.sendIdeaSubmittedEmail = async (email, fullName, ideaTitle) => {
 
 // Idea assigned to evaluator
 exports.sendIdeaAssignedEmail = async (email, fullName, ideaTitle, ideaId) => {
-  const evaluateUrl = `${process.env.FRONTEND_URL}/evaluate/${ideaId}`;
-  const subject = 'New Idea Assigned for Evaluation';
+  const evaluateUrl = `${emailConfig.frontendUrl}/evaluate/${ideaId}`;
+  const subject = "New Idea Assigned for Evaluation";
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <h1 style="color: #ff6b35;">New Evaluation Assignment 📋</h1>
@@ -172,8 +171,12 @@ exports.sendIdeaAssignedEmail = async (email, fullName, ideaTitle, ideaId) => {
 };
 
 // Evaluation completed notification to admin
-exports.sendEvaluationCompletedEmail = async (adminEmail, evaluatorName, ideaTitle) => {
-  const subject = 'Evaluation Completed - Admin Notification';
+exports.sendEvaluationCompletedEmail = async (
+  adminEmail,
+  evaluatorName,
+  ideaTitle
+) => {
+  const subject = "Evaluation Completed - Admin Notification";
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <h1 style="color: #ff6b35;">Evaluation Completed ✅</h1>
@@ -182,7 +185,7 @@ exports.sendEvaluationCompletedEmail = async (adminEmail, evaluatorName, ideaTit
       <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
         <h3 style="margin: 0;">${ideaTitle}</h3>
       </div>
-      <p>View details in the admin dashboard: <a href="${process.env.FRONTEND_URL}/admin">Admin Dashboard</a></p>
+      <p>View details in the admin dashboard: <a href="${emailConfig.frontendUrl}/admin">Admin Dashboard</a></p>
       <p>Best regards,<br>mAIple System</p>
     </div>
   `;
@@ -190,11 +193,18 @@ exports.sendEvaluationCompletedEmail = async (adminEmail, evaluatorName, ideaTit
 };
 
 // Idea status changed notification
-exports.sendIdeaStatusChangedEmail = async (email, fullName, ideaTitle, newStatus) => {
+exports.sendIdeaStatusChangedEmail = async (
+  email,
+  fullName,
+  ideaTitle,
+  newStatus
+) => {
   const statusMessages = {
-    under_review: 'Your idea is now under review by our evaluators.',
-    approved: '🎉 Congratulations! Your idea has been approved for the pitch competition!',
-    rejected: 'Unfortunately, your idea was not selected for this round. We encourage you to refine and resubmit.'
+    under_review: "Your idea is now under review by our evaluators.",
+    approved:
+      "🎉 Congratulations! Your idea has been approved for the pitch competition!",
+    rejected:
+      "Unfortunately, your idea was not selected for this round. We encourage you to refine and resubmit.",
   };
 
   const subject = `Idea Status Update: ${ideaTitle}`;
@@ -204,9 +214,13 @@ exports.sendIdeaStatusChangedEmail = async (email, fullName, ideaTitle, newStatu
       <p>Hi ${fullName},</p>
       <p>The status of your idea "<strong>${ideaTitle}</strong>" has been updated to: <strong>${newStatus}</strong></p>
       <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
-        <p style="margin: 0;">${statusMessages[newStatus] || 'Status updated.'}</p>
+        <p style="margin: 0;">${
+          statusMessages[newStatus] || "Status updated."
+        }</p>
       </div>
-      <p>View more details: <a href="${process.env.FRONTEND_URL}/dashboard">Dashboard</a></p>
+      <p>View more details: <a href="${
+        emailConfig.frontendUrl
+      }/dashboard">Dashboard</a></p>
       <p>Best regards,<br>The mAIple Team</p>
     </div>
   `;
@@ -215,7 +229,7 @@ exports.sendIdeaStatusChangedEmail = async (email, fullName, ideaTitle, newStatu
 
 // Role assignment notification
 exports.sendRoleAssignedEmail = async (email, fullName, roles) => {
-  const subject = 'Your mAIple Roles Have Been Updated';
+  const subject = "Your mAIple Roles Have Been Updated";
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <h1 style="color: #ff6b35;">Roles Updated 🎭</h1>
@@ -224,10 +238,17 @@ exports.sendRoleAssignedEmail = async (email, fullName, roles) => {
       <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
         <strong>Your current roles:</strong>
         <ul>
-          ${roles.map(role => `<li>${role.charAt(0).toUpperCase() + role.slice(1)}</li>`).join('')}
+          ${roles
+            .map(
+              (role) =>
+                `<li>${role.charAt(0).toUpperCase() + role.slice(1)}</li>`
+            )
+            .join("")}
         </ul>
       </div>
-      <p>Log in to explore your new capabilities: <a href="${process.env.FRONTEND_URL}/login">Login</a></p>
+      <p>Log in to explore your new capabilities: <a href="${
+        emailConfig.frontendUrl
+      }/login">Login</a></p>
       <p>Best regards,<br>The mAIple Team</p>
     </div>
   `;

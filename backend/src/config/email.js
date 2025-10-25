@@ -1,27 +1,35 @@
-const SibApiV3Sdk = require('sib-api-v3-sdk');
+const nodemailer = require('nodemailer');
 
-// Configure Brevo (Sendinblue) API client
-const configureBrevoClient = () => {
-  const defaultClient = SibApiV3Sdk.ApiClient.instance;
-  const apiKey = defaultClient.authentications['api-key'];
-  
-  if (!process.env.BREVO_API_KEY) {
-    console.warn('⚠️  BREVO_API_KEY not configured. Email service will not work.');
+// Create SMTP transporter
+const createTransporter = () => {
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.warn('⚠️  SMTP credentials not configured. Email service will not work.');
     return null;
   }
 
-  apiKey.apiKey = process.env.BREVO_API_KEY;
-  
-  console.log('✅ Brevo email client configured');
-  return new SibApiV3Sdk.TransactionalEmailsApi();
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT) || 587,
+    secure: false, // true for 465, false for other ports
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS
+    },
+    tls: {
+      rejectUnauthorized: false // For development - remove in production
+    }
+  });
+
+  console.log('✅ SMTP email transporter configured');
+  return transporter;
 };
 
 // Email configuration
 const emailConfig = {
-  apiInstance: configureBrevoClient(),
+  transporter: createTransporter(),
   sender: {
-    name: process.env.BREVO_SENDER_NAME || 'mAIple Conference',
-    email: process.env.BREVO_SENDER_EMAIL || 'noreply@maipleconf.com'
+    name: process.env.SMTP_SENDER_NAME || 'mAIple Conference',
+    email: process.env.SMTP_SENDER_EMAIL || process.env.SMTP_USER || 'noreply@maipleconf.com'
   },
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173'
 };
@@ -30,12 +38,16 @@ const emailConfig = {
 const validateEmailConfig = () => {
   const errors = [];
 
-  if (!process.env.BREVO_API_KEY) {
-    errors.push('BREVO_API_KEY is not set');
+  if (!process.env.SMTP_HOST) {
+    errors.push('SMTP_HOST is not set');
   }
 
-  if (!process.env.BREVO_SENDER_EMAIL) {
-    errors.push('BREVO_SENDER_EMAIL is not set');
+  if (!process.env.SMTP_USER) {
+    errors.push('SMTP_USER is not set');
+  }
+
+  if (!process.env.SMTP_PASS) {
+    errors.push('SMTP_PASS is not set');
   }
 
   if (errors.length > 0) {
@@ -47,13 +59,30 @@ const validateEmailConfig = () => {
   return true;
 };
 
+// Test email connection
+const testConnection = async () => {
+  if (!emailConfig.transporter) {
+    return false;
+  }
+
+  try {
+    await emailConfig.transporter.verify();
+    console.log('✅ SMTP connection verified successfully');
+    return true;
+  } catch (error) {
+    console.error('❌ SMTP connection failed:', error.message);
+    return false;
+  }
+};
+
 // Check if email service is enabled
 const isEmailEnabled = () => {
-  return emailConfig.apiInstance !== null && validateEmailConfig();
+  return emailConfig.transporter !== null && validateEmailConfig();
 };
 
 module.exports = {
   emailConfig,
   validateEmailConfig,
-  isEmailEnabled
+  isEmailEnabled,
+  testConnection
 };
