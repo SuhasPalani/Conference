@@ -9,6 +9,7 @@ const {
 } = require("../utils/validation");
 
 // Register user
+// Register user
 exports.register = async (req, res, next) => {
   try {
     const { email, password, fullName } = req.body;
@@ -42,21 +43,21 @@ exports.register = async (req, res, next) => {
       password,
       fullName,
       roles: ["basic"],
-      isVerified: false, // Explicitly set to false
+      isVerified: false,
     });
 
     // Generate verification token
     const verificationToken = await Token.generateVerificationToken(user._id);
 
-    // Send verification email
+    // Send verification email ONLY
     await emailService.sendVerificationEmail(
       email,
       fullName,
       verificationToken.token
     );
 
-    // Send welcome email (optional)
-    await emailService.sendWelcomeEmail(email, fullName);
+    // ❌ REMOVE THIS LINE - Welcome email will be sent after verification
+    // await emailService.sendWelcomeEmail(email, fullName);
 
     res.status(201).json({
       message:
@@ -66,7 +67,7 @@ exports.register = async (req, res, next) => {
         email: user.email,
         fullName: user.fullName,
         roles: user.roles,
-        isVerified: user.isVerified, // Should be false
+        isVerified: user.isVerified,
       },
     });
   } catch (error) {
@@ -159,11 +160,11 @@ exports.verifyEmail = async (req, res, next) => {
         alreadyVerified: true,
       });
     }
-
+    
     // Set user as verified
     user.isVerified = true;
     await user.save();
-
+    await emailService.sendWelcomeEmail(user.email, user.fullName);
     res.json({
       message: "Email verified successfully! You can now login.",
       success: true,
