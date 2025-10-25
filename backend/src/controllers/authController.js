@@ -7,7 +7,6 @@ const {
   validatePassword,
   validateFullName,
 } = require("../utils/validation");
-const { getClientIp, getUserAgent } = require("../utils/helpers");
 
 // Register user
 exports.register = async (req, res, next) => {
@@ -37,12 +36,13 @@ exports.register = async (req, res, next) => {
       return res.status(400).json({ error: "Email already registered" });
     }
 
-    // Create user
+    // Create user - isVerified defaults to FALSE
     const user = await User.create({
       email,
       password,
       fullName,
       roles: ["basic"],
+      isVerified: false, // Explicitly set to false
     });
 
     // Generate verification token
@@ -54,6 +54,8 @@ exports.register = async (req, res, next) => {
       fullName,
       verificationToken.token
     );
+
+    // Send welcome email (optional)
     await emailService.sendWelcomeEmail(email, fullName);
 
     res.status(201).json({
@@ -64,6 +66,7 @@ exports.register = async (req, res, next) => {
         email: user.email,
         fullName: user.fullName,
         roles: user.roles,
+        isVerified: user.isVerified, // Should be false
       },
     });
   } catch (error) {
@@ -93,6 +96,14 @@ exports.login = async (req, res, next) => {
     const isPasswordCorrect = await user.comparePassword(password);
     if (!isPasswordCorrect) {
       return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    // Check if email is verified
+    if (!user.isVerified) {
+      return res.status(403).json({
+        error: "Please verify your email address before logging in.",
+        needsVerification: true,
+      });
     }
 
     // Update last login
@@ -126,6 +137,7 @@ exports.verifyEmail = async (req, res, next) => {
   try {
     const { token } = req.params;
 
+    // Verify and use the token
     const tokenDoc = await Token.verifyAndUseToken(token, "verification");
 
     if (!tokenDoc) {
@@ -134,15 +146,72 @@ exports.verifyEmail = async (req, res, next) => {
         .json({ error: "Invalid or expired verification token" });
     }
 
+    // Find user and verify
     const user = await User.findById(tokenDoc.userId);
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
 
+    // Check if already verified
+    if (user.isVerified) {
+      return res.status(200).json({
+        message: "Email already verified. You can now login.",
+        alreadyVerified: true,
+      });
+    }
+
+    // Set user as verified
     user.isVerified = true;
     await user.save();
 
-    res.json({ message: "Email verified successfully" });
+    res.json({
+      message: "Email verified successfully! You can now login.",
+      success: true,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Resend verification email
+exports.resendVerification = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
+    }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      // Don't reveal if user exists
+      return res.json({
+        message:
+          "If that email exists and is not verified, a verification email has been sent.",
+      });
+    }
+
+    if (user.isVerified) {
+      return res.status(400).json({ error: "Email is already verified" });
+    }
+
+    // Invalidate old verification tokens
+    await Token.invalidateUserTokens(user._id, "verification");
+
+    // Generate new verification token
+    const verificationToken = await Token.generateVerificationToken(user._id);
+
+    // Send verification email
+    await emailService.sendVerificationEmail(
+      email,
+      user.fullName,
+      verificationToken.token
+    );
+
+    res.json({
+      message: "Verification email sent. Please check your inbox.",
+    });
   } catch (error) {
     next(error);
   }
@@ -207,7 +276,7 @@ exports.resetPassword = async (req, res, next) => {
     user.password = password;
     await user.save();
 
-    res.json({ message: "Password reset successful" });
+    res.json({ message: "Password reset successful. You can now login." });
   } catch (error) {
     next(error);
   }
@@ -251,6 +320,14 @@ exports.refreshToken = async (req, res, next) => {
       return res.status(401).json({ error: "Invalid token" });
     }
 
+    // Check if user is verified
+    if (!user.isVerified) {
+      return res.status(403).json({
+        error: "Email not verified",
+        needsVerification: true,
+      });
+    }
+
     // Generate new token
     const newToken = generateAccessToken(user._id);
 
@@ -259,3 +336,5 @@ exports.refreshToken = async (req, res, next) => {
     return res.status(401).json({ error: "Token refresh failed" });
   }
 };
+
+module.exports = exports;
