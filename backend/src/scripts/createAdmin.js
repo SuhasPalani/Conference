@@ -1,7 +1,7 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
 const readline = require('readline');
-const User = require('../src/models/User');
+const User = require('../models/User');
 
 const rl = readline.createInterface({
   input: process.stdin,

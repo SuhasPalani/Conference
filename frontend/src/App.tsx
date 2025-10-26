@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { useAuth } from './hooks/useAuth';
 import { ToastContainer } from './hooks/useToast';
-
+import VerifyEmail from './pages/VerifyEmail';
 // Pages
 import Landing from './pages/Landing';
 import Login from './pages/Login';
@@ -44,7 +44,8 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
-        
+        <Route path="/verify-email/:token" element={<VerifyEmail />} />
+
         <Route
           path="/dashboard"
           element={

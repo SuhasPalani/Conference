@@ -20,12 +20,12 @@ export default function NotFound() {
             className="px-8 py-4 gradient-primary text-white rounded-lg font-semibold hover:opacity-90 transition-all"
           >
             Go Home
+          </Link>
           <Link
             to="/dashboard"
             className="px-8 py-4 bg-white/5 backdrop-blur-md text-white rounded-lg font-semibold hover:bg-white/10 transition-all"
           >
             Dashboard
-          </Link>
           </Link>
         </div>
 
