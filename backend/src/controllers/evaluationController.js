@@ -1,3 +1,4 @@
+// FILE: backend/src/controllers/evaluationController.js
 const Evaluation = require("../models/Evaluation");
 const Idea = require("../models/Idea");
 const User = require("../models/User");
@@ -12,7 +13,7 @@ exports.getAssignedIdeas = async (req, res, next) => {
     const ideas = await Idea.find({
       assignedEvaluators: req.user.id,
       status: { $in: ["submitted", "under_review"] },
-    }).populate("founderId", "fullName"); // Redact founder email
+    }).populate("founderId", "fullName");
 
     // Get evaluation status for each idea
     const ideasWithEvalStatus = await Promise.all(
@@ -69,7 +70,7 @@ exports.submitEvaluation = async (req, res, next) => {
     }
 
     // Check if idea exists and is assigned to evaluator
-    const idea = await Idea.findById(ideaId);
+    const idea = await Idea.findById(ideaId).populate("founderId");
 
     if (!idea) {
       return res.status(404).json({ error: "Idea not found" });
@@ -112,6 +113,15 @@ exports.submitEvaluation = async (req, res, next) => {
 
     // Update idea's average score
     await updateIdeaAverageScore(ideaId);
+
+    // Send notification to founder
+    await emailService.sendEvaluationCompletedToFounder(
+      idea.founderId.email,
+      idea.founderId.fullName,
+      idea.title,
+      req.user.fullName,
+      evaluation.averageScore
+    );
 
     // Notify admin
     const admins = await User.find({ roles: "admin" });
@@ -222,11 +232,10 @@ exports.getIdeaEvaluations = async (req, res, next) => {
 };
 
 // Helper function to update idea's average score
-// Helper function to update idea's average score
 async function updateIdeaAverageScore(ideaId) {
-  const evaluations = await Evaluation.find({ 
-    ideaId, 
-    status: 'completed' 
+  const evaluations = await Evaluation.find({
+    ideaId,
+    status: "completed",
   });
 
   if (evaluations.length === 0) {
@@ -240,10 +249,9 @@ async function updateIdeaAverageScore(ideaId) {
   const averageScore = totalScore / evaluations.length;
 
   await Idea.findByIdAndUpdate(ideaId, {
-    averageScore,
-    evaluationCount: evaluations.length
+    averageScore: parseFloat(averageScore.toFixed(1)),
+    evaluationCount: evaluations.length,
   });
 }
-
 
 module.exports = exports;

@@ -1,3 +1,4 @@
+// FILE: backend/src/services/emailService.js
 const { emailConfig } = require("../config/email");
 
 // Helper function to send email
@@ -36,12 +37,12 @@ exports.sendWelcomeEmail = async (email, fullName) => {
       <h1 style="color: #ff6b35;">Welcome to mAIple! 🍁</h1>
       <p>Hi ${fullName},</p>
       <p>Thank you for joining the mAIple AI Conference portal. We're excited to have you as part of our innovative community!</p>
-      <p>Your account has been created with basic access. An administrator will review and assign appropriate roles based on your participation.</p>
+      <p>Your email has been verified and your account is now active!</p>
       <h3>What's Next?</h3>
       <ul>
-        <li><strong>Founders:</strong> Once assigned the founder role, you can submit your AI ideas</li>
-        <li><strong>Evaluators:</strong> Review and score innovative submissions</li>
-        <li><strong>Attendees:</strong> Stay updated with conference news and schedule</li>
+        <li><strong>Founders:</strong> Request founder role to submit your AI ideas</li>
+        <li><strong>Evaluators:</strong> Request evaluator role to review submissions</li>
+        <li><strong>Attendees:</strong> Stay updated with conference news</li>
       </ul>
       <p>Visit your dashboard to get started: <a href="${emailConfig.frontendUrl}/dashboard">Dashboard</a></p>
       <p>Best regards,<br>The mAIple Team</p>
@@ -120,9 +121,10 @@ exports.sendIdeaSubmittedEmail = async (email, fullName, ideaTitle) => {
       <p>Your idea "<strong>${ideaTitle}</strong>" has been successfully submitted for review.</p>
       <p><strong>What happens next?</strong></p>
       <ol>
-        <li>Our expert evaluators will review your submission</li>
-        <li>You'll receive feedback and scores within 5-7 business days</li>
-        <li>Top ideas will be selected for the pitch competition</li>
+        <li>Our admin will assign expert evaluators to your submission</li>
+        <li>Evaluators will review your idea and provide scores</li>
+        <li>You'll receive feedback and final decision within 5-7 business days</li>
+        <li>You'll be notified at each step of the process</li>
       </ol>
       <p>You can track your submission status in your dashboard: <a href="${emailConfig.frontendUrl}/dashboard">View Dashboard</a></p>
       <p>Good luck! 🌟</p>
@@ -132,9 +134,46 @@ exports.sendIdeaSubmittedEmail = async (email, fullName, ideaTitle) => {
   return await sendEmail(email, subject, html);
 };
 
+// New submission notification to admin
+exports.sendNewSubmissionNotification = async (
+  adminEmail,
+  adminName,
+  ideaTitle,
+  founderName,
+  ideaId
+) => {
+  const subject = "New Idea Submission - Action Required";
+  const ideaUrl = `${emailConfig.frontendUrl}/admin?tab=ideas&id=${ideaId}`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h1 style="color: #ff6b35;">New Idea Submitted 🎯</h1>
+      <p>Hi ${adminName},</p>
+      <p>A new idea has been submitted and requires evaluator assignment:</p>
+      <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
+        <h3 style="margin: 0;">${ideaTitle}</h3>
+        <p style="margin: 5px 0;">by ${founderName}</p>
+      </div>
+      <p>Please assign evaluators to review this submission.</p>
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="${ideaUrl}" 
+           style="background: linear-gradient(135deg, #ff6b35 0%, #e84118 100%); 
+                  color: white; 
+                  padding: 12px 30px; 
+                  text-decoration: none; 
+                  border-radius: 5px;
+                  display: inline-block;">
+          Assign Evaluators
+        </a>
+      </div>
+      <p>Best regards,<br>mAIple System</p>
+    </div>
+  `;
+  return await sendEmail(adminEmail, subject, html);
+};
+
 // Idea assigned to evaluator
 exports.sendIdeaAssignedEmail = async (email, fullName, ideaTitle, ideaId) => {
-  const evaluateUrl = `${emailConfig.frontendUrl}/evaluate/${ideaId}`;
+  const evaluateUrl = `${emailConfig.frontendUrl}/evaluate?id=${ideaId}`;
   const subject = "New Idea Assigned for Evaluation";
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -170,6 +209,31 @@ exports.sendIdeaAssignedEmail = async (email, fullName, ideaTitle, ideaId) => {
   return await sendEmail(email, subject, html);
 };
 
+// Evaluation completed notification to founder
+exports.sendEvaluationCompletedToFounder = async (
+  founderEmail,
+  founderName,
+  ideaTitle,
+  evaluatorName,
+  averageScore
+) => {
+  const subject = "Evaluation Completed for Your Idea";
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h1 style="color: #ff6b35;">Evaluation Received! ⭐</h1>
+      <p>Hi ${founderName},</p>
+      <p>Good news! <strong>${evaluatorName}</strong> has completed their evaluation for your idea:</p>
+      <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
+        <h3 style="margin: 0;">${ideaTitle}</h3>
+        <p style="margin: 10px 0 0 0; font-size: 24px; color: #ff6b35;"><strong>Score: ${averageScore}/10</strong></p>
+      </div>
+      <p>View detailed feedback in your dashboard: <a href="${emailConfig.frontendUrl}/dashboard">View Feedback</a></p>
+      <p>Best regards,<br>The mAIple Team</p>
+    </div>
+  `;
+  return await sendEmail(founderEmail, subject, html);
+};
+
 // Evaluation completed notification to admin
 exports.sendEvaluationCompletedEmail = async (
   adminEmail,
@@ -197,27 +261,44 @@ exports.sendIdeaStatusChangedEmail = async (
   email,
   fullName,
   ideaTitle,
-  newStatus
+  newStatus,
+  changedBy
 ) => {
   const statusMessages = {
-    under_review: "Your idea is now under review by our evaluators.",
-    approved:
-      "🎉 Congratulations! Your idea has been approved for the pitch competition!",
-    rejected:
-      "Unfortunately, your idea was not selected for this round. We encourage you to refine and resubmit.",
+    under_review: `Your idea is now under review by our expert evaluators.`,
+    approved: `🎉 Congratulations! Your idea has been <strong>approved</strong>! You're one step closer to the pitch competition.`,
+    rejected: `Unfortunately, your idea was not selected for this round. We encourage you to refine your proposal and resubmit. Check the detailed feedback from evaluators.`,
   };
 
-  const subject = `Idea Status Update: ${ideaTitle}`;
+  const subject = `Idea Status Update: ${newStatus
+    .replace("_", " ")
+    .toUpperCase()}`;
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <h1 style="color: #ff6b35;">Idea Status Update</h1>
       <p>Hi ${fullName},</p>
-      <p>The status of your idea "<strong>${ideaTitle}</strong>" has been updated to: <strong>${newStatus}</strong></p>
-      <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
-        <p style="margin: 0;">${
+      <p>The status of your idea "<strong>${ideaTitle}</strong>" has been updated:</p>
+      <div style="background: ${
+        newStatus === "approved"
+          ? "#d4edda"
+          : newStatus === "rejected"
+          ? "#f8d7da"
+          : "#fff3cd"
+      }; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid ${
+    newStatus === "approved"
+      ? "#28a745"
+      : newStatus === "rejected"
+      ? "#dc3545"
+      : "#ffc107"
+  };">
+        <p style="margin: 0; font-size: 18px;"><strong>New Status: ${newStatus
+          .replace("_", " ")
+          .toUpperCase()}</strong></p>
+        <p style="margin: 10px 0 0 0;">${
           statusMessages[newStatus] || "Status updated."
         }</p>
       </div>
+      ${changedBy ? `<p><em>Status changed by: ${changedBy}</em></p>` : ""}
       <p>View more details: <a href="${
         emailConfig.frontendUrl
       }/dashboard">Dashboard</a></p>
@@ -254,3 +335,5 @@ exports.sendRoleAssignedEmail = async (email, fullName, roles) => {
   `;
   return await sendEmail(email, subject, html);
 };
+
+module.exports = exports;

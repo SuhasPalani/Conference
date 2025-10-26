@@ -93,8 +93,9 @@ export const adminAPI = {
   getIdeas: (params?: any) => api.get('/admin/ideas', { params }),
   updateIdeaStatus: (id: string, status: string) => 
     api.put(`/admin/ideas/${id}/status`, { status }),
-  assignEvaluators: (id: string, evaluatorIds: string[]) => 
-    api.post(`/admin/ideas/${id}/assign`, { evaluatorIds }),
+  assignEvaluators: (id: string, evaluatorIds: string[], autoAssign?: boolean) => 
+    api.post(`/admin/ideas/${id}/assign`, { evaluatorIds, autoAssign }),
+  getEvaluatorWorkload: () => api.get('/admin/evaluators/workload'),
   exportIdeas: () => api.get('/admin/export/ideas'),
   exportEvaluations: () => api.get('/admin/export/evaluations'),
 };

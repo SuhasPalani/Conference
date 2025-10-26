@@ -10,27 +10,41 @@ export default function VerifyEmail() {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    if (!token) return;
+    if (!token) {
+      setStatus('error');
+      setMessage('No verification token provided');
+      return;
+    }
 
     const verifyEmail = async () => {
       try {
-        const { data } = await authAPI.verifyEmail(token);
+        const response = await authAPI.verifyEmail(token);
+        const data = response.data;
         
-        if (data.alreadyVerified) {
-          setStatus('already-verified');
-          setMessage('Your email is already verified. You can login now.');
+        if (data.success) {
+          if (data.alreadyVerified) {
+            setStatus('already-verified');
+            setMessage('Your email is already verified. You can login now.');
+          } else {
+            setStatus('success');
+            setMessage('Email verified successfully! You can now login.');
+          }
+          
+          // Redirect to login after 3 seconds
+          setTimeout(() => {
+            navigate('/login');
+          }, 3000);
         } else {
-          setStatus('success');
-          setMessage('Email verified successfully! You can now login.');
+          setStatus('error');
+          setMessage(data.error || 'Verification failed');
         }
-        
-        // Redirect to login after 3 seconds
-        setTimeout(() => {
-          navigate('/login');
-        }, 3000);
       } catch (error: any) {
+        console.error('Verification error:', error);
         setStatus('error');
-        setMessage(error.response?.data?.error || 'Verification failed. The link may be invalid or expired.');
+        setMessage(
+          error.response?.data?.error || 
+          'Verification failed. The link may be invalid or expired.'
+        );
       }
     };
 

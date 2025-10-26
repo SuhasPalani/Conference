@@ -9,6 +9,8 @@ export default function MyIdeas() {
   const { addToast } = useToast();
   const queryClient = useQueryClient();
   const [selectedIdea, setSelectedIdea] = useState<any>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editFormData, setEditFormData] = useState<any>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['myIdeas'],
@@ -26,6 +28,20 @@ export default function MyIdeas() {
     },
     onError: (error: any) => {
       addToast(error.response?.data?.error || 'Failed to submit idea', 'error');
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => ideaAPI.update(id, data),
+    onSuccess: () => {
+      addToast('Idea updated successfully!', 'success');
+      queryClient.invalidateQueries({ queryKey: ['myIdeas'] });
+      setIsEditing(false);
+      setEditFormData(null);
+      setSelectedIdea(null);
+    },
+    onError: (error: any) => {
+      addToast(error.response?.data?.error || 'Failed to update idea', 'error');
     },
   });
 
@@ -52,6 +68,26 @@ export default function MyIdeas() {
     return colors[status] || 'bg-gray-700 text-gray-300';
   };
 
+  const canEdit = (status: string) => ['draft', 'rejected'].includes(status);
+  const canDelete = (status: string) => ['draft', 'rejected'].includes(status);
+
+  const handleEdit = (idea: any) => {
+    setEditFormData({
+      title: idea.title,
+      abstract: idea.abstract,
+      problem: idea.problem,
+      solution: idea.solution,
+      team: idea.team,
+    });
+    setSelectedIdea(idea);
+    setIsEditing(true);
+  };
+
+  const handleUpdate = () => {
+    if (!selectedIdea) return;
+    updateMutation.mutate({ id: selectedIdea._id, data: editFormData });
+  };
+
   if (isLoading) {
     return (
       <div className="glass-morphism rounded-xl p-6">
@@ -64,7 +100,7 @@ export default function MyIdeas() {
 
   return (
     <div className="space-y-6">
-      <div className="glass-morphism rounded-xl p-6">
+      <div className="glass-morph rounded-xl p-6">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold text-white">Your Ideas</h2>
           <span className="px-3 py-1 bg-orange-900/30 text-orange-300 rounded-full text-sm font-semibold">
@@ -120,35 +156,67 @@ export default function MyIdeas() {
                   )}
                 </div>
 
-                <div className="flex gap-2">
+                {/* Evaluation Details */}
+                {idea.evaluations && idea.evaluations.length > 0 && (
+                  <div className="mb-4 p-3 bg-gray-900/50 rounded-lg">
+                    <h4 className="text-sm font-semibold text-gray-300 mb-2">Evaluations:</h4>
+                    {idea.evaluations.map((evaluation: any, idx: number) => (
+                      <div key={idx} className="text-xs text-gray-400 mb-2 pb-2 border-b border-gray-700 last:border-0">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="font-semibold text-white">👤 {evaluation.evaluatorName}</span>
+                          <span className="text-orange-500 font-bold">⭐ {evaluation.averageScore}/10</span>
+                        </div>
+                        <p className="text-gray-400 italic">{evaluation.comments}</p>
+                        <span className="text-gray-600 text-xs">
+                          {formatDate(evaluation.submittedAt)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex gap-2 flex-wrap">
                   <button
-                    onClick={() => setSelectedIdea(idea)}
+                    onClick={() => {
+                      setSelectedIdea(idea);
+                      setIsEditing(false);
+                    }}
                     className="px-4 py-2 bg-gray-700 text-white rounded-lg text-sm font-semibold hover:bg-gray-600 transition-all"
                   >
                     View Details
                   </button>
 
+                  {canEdit(idea.status) && (
+                    <button
+                      onClick={() => handleEdit(idea)}
+                      className="px-4 py-2 bg-blue-900/30 text-blue-300 rounded-lg text-sm font-semibold hover:bg-blue-900/50 transition-all"
+                    >
+                      Edit
+                    </button>
+                  )}
+
                   {idea.status === 'draft' && (
-                    <>
-                      <button
-                        onClick={() => submitMutation.mutate(idea._id)}
-                        disabled={submitMutation.isPending}
-                        className="px-4 py-2 gradient-primary text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-all disabled:opacity-50"
-                      >
-                        Submit for Review
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (confirm(`Delete "${idea.title}"? This action cannot be undone.`)) {
-                            deleteMutation.mutate(idea._id);
-                          }
-                        }}
-                        disabled={deleteMutation.isPending}
-                        className="px-4 py-2 bg-red-900/30 text-red-400 rounded-lg text-sm font-semibold hover:bg-red-900/50 transition-all disabled:opacity-50"
-                      >
-                        Delete
-                      </button>
-                    </>
+                    <button
+                      onClick={() => submitMutation.mutate(idea._id)}
+                      disabled={submitMutation.isPending}
+                      className="px-4 py-2 gradient-primary text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-all disabled:opacity-50"
+                    >
+                      Submit for Review
+                    </button>
+                  )}
+
+                  {canDelete(idea.status) && (
+                    <button
+                      onClick={() => {
+                        if (confirm(`Delete "${idea.title}"? This action cannot be undone.`)) {
+                          deleteMutation.mutate(idea._id);
+                        }
+                      }}
+                      disabled={deleteMutation.isPending}
+                      className="px-4 py-2 bg-red-900/30 text-red-400 rounded-lg text-sm font-semibold hover:bg-red-900/50 transition-all disabled:opacity-50"
+                    >
+                      Delete
+                    </button>
                   )}
                 </div>
               </div>
@@ -157,13 +225,25 @@ export default function MyIdeas() {
         )}
       </div>
 
-      {/* View Details Modal */}
+      {/* View/Edit Details Modal */}
       {selectedIdea && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="glass-morphism rounded-2xl p-8 max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="glass-morph rounded-2xl p-8 max-w-3xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-start justify-between mb-6">
               <div className="flex-1">
-                <h2 className="text-3xl font-bold text-white mb-2">{selectedIdea.title}</h2>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    title="Title"
+                    placeholder="Idea title"
+                    value={editFormData.title}
+                    onChange={(e) => setEditFormData({ ...editFormData, title: e.target.value })}
+                    className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white text-2xl font-bold mb-2"
+                    maxLength={100}
+                  />
+                ) : (
+                  <h2 className="text-3xl font-bold text-white mb-2">{selectedIdea.title}</h2>
+                )}
                 <span
                   className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(
                     selectedIdea.status
@@ -173,7 +253,11 @@ export default function MyIdeas() {
                 </span>
               </div>
               <button
-                onClick={() => setSelectedIdea(null)}
+                onClick={() => {
+                  setSelectedIdea(null);
+                  setIsEditing(false);
+                  setEditFormData(null);
+                }}
                 className="text-gray-400 hover:text-white text-2xl"
               >
                 ×
@@ -181,35 +265,117 @@ export default function MyIdeas() {
             </div>
 
             <div className="space-y-6">
-              <div>
-                <h3 className="text-sm font-semibold text-gray-400 mb-2">ABSTRACT</h3>
-                <p className="text-white">{selectedIdea.abstract}</p>
-              </div>
+              <h3 className="text-xl font-semibold text-white mt-4 border-b border-gray-700 pb-2">Abstract</h3>
+              {isEditing ? (
+                <textarea
+                  title="Abstract"
+                  placeholder="Brief abstract (max 500 chars)"
+                  value={editFormData.abstract}
+                  onChange={(e) => setEditFormData({ ...editFormData, abstract: e.target.value })}
+                  className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white"
+                  rows={3}
+                  maxLength={500}
+                />
+              ) : (
+                <p className="text-gray-300 whitespace-pre-wrap">{selectedIdea.abstract}</p>
+              )}
 
-              <div>
-                <h3 className="text-sm font-semibold text-gray-400 mb-2">PROBLEM</h3>
-                <p className="text-white">{selectedIdea.problem}</p>
-              </div>
+              <h3 className="text-xl font-semibold text-white mt-4 border-b border-gray-700 pb-2">Problem</h3>
+              {isEditing ? (
+                <textarea
+                  title="Problem"
+                  placeholder="Describe the problem your idea addresses"
+                  value={editFormData.problem}
+                  onChange={(e) => setEditFormData({ ...editFormData, problem: e.target.value })}
+                  className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white"
+                  rows={4}
+                  maxLength={1000}
+                />
+              ) : (
+                <p className="text-gray-300 whitespace-pre-wrap">{selectedIdea.problem}</p>
+              )}
 
-              <div>
-                <h3 className="text-sm font-semibold text-gray-400 mb-2">SOLUTION</h3>
-                <p className="text-white">{selectedIdea.solution}</p>
-              </div>
+              <h3 className="text-xl font-semibold text-white mt-4 border-b border-gray-700 pb-2">Solution</h3>
+              {isEditing ? (
+                <textarea
+                  title="Solution"
+                  placeholder="Explain your solution"
+                  value={editFormData.solution}
+                  onChange={(e) => setEditFormData({ ...editFormData, solution: e.target.value })}
+                  className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white"
+                  rows={4}
+                  maxLength={1000}
+                />
+              ) : (
+                <p className="text-gray-300 whitespace-pre-wrap">{selectedIdea.solution}</p>
+              )}
 
-              <div>
-                <h3 className="text-sm font-semibold text-gray-400 mb-2">TEAM</h3>
-                <p className="text-white">{selectedIdea.team}</p>
-              </div>
+              <h3 className="text-xl font-semibold text-white mt-4 border-b border-gray-700 pb-2">Team</h3>
+              {isEditing ? (
+                <textarea
+                  title="Team"
+                  placeholder="Team details or collaborators"
+                  value={editFormData.team}
+                  onChange={(e) => setEditFormData({ ...editFormData, team: e.target.value })}
+                  className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white"
+                  rows={3}
+                  maxLength={500}
+                />
+              ) : (
+                <p className="text-gray-300 whitespace-pre-wrap">{selectedIdea.team}</p>
+              )}
 
               {selectedIdea.averageScore && (
                 <div className="p-4 gradient-dark rounded-lg">
                   <div className="flex justify-between items-center">
-                    <span className="text-white font-semibold">Average Score</span>
-                    <span className="text-3xl font-black text-gradient">
+                    <span className="text-lg font-semibold text-white">Overall Score</span>
+                    <span className="text-3xl font-bold text-orange-500">
                       {selectedIdea.averageScore}/10
                     </span>
                   </div>
+                  {selectedIdea.evaluations && selectedIdea.evaluations.length > 0 && (
+                    <p className="text-sm text-gray-400 mt-2">
+                      Based on {selectedIdea.evaluationCount} evaluations.
+                    </p>
+                  )}
                 </div>
+              )}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="mt-6 flex gap-3">
+              {isEditing ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditing(false);
+                      setEditFormData(null);
+                    }}
+                    className="flex-1 py-3 bg-gray-700 text-white rounded-lg font-semibold hover:bg-gray-600 transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleUpdate}
+                    disabled={updateMutation.isPending}
+                    className="flex-1 py-3 gradient-primary text-white rounded-lg font-semibold hover:opacity-90 transition-all disabled:opacity-50"
+                  >
+                    {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedIdea(null);
+                    setIsEditing(false);
+                  }}
+                  className="flex-1 py-3 bg-gray-700 text-white rounded-lg font-semibold hover:bg-gray-600 transition-all"
+                >
+                  Close
+                </button>
               )}
             </div>
           </div>

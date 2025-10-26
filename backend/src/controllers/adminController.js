@@ -1,3 +1,4 @@
+// FILE: backend/src/controllers/adminController.js
 const User = require("../models/User");
 const Idea = require("../models/Idea");
 const Evaluation = require("../models/Evaluation");
@@ -201,7 +202,8 @@ exports.updateIdeaStatus = async (req, res, next) => {
         idea.founderId.email,
         idea.founderId.fullName,
         idea.title,
-        status
+        status,
+        req.user.fullName
       );
     }
 
@@ -211,11 +213,11 @@ exports.updateIdeaStatus = async (req, res, next) => {
   }
 };
 
-// Assign evaluators to idea
+// Assign evaluators to idea with queue system
 exports.assignEvaluators = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { evaluatorIds } = req.body;
+    const { evaluatorIds, autoAssign } = req.body;
 
     const idea = await Idea.findById(id);
 
@@ -223,13 +225,61 @@ exports.assignEvaluators = async (req, res, next) => {
       return res.status(404).json({ error: "Idea not found" });
     }
 
+    let finalEvaluatorIds = evaluatorIds || [];
+
+    // Auto-assign using queue system if requested
+    if (autoAssign) {
+      const evaluators = await User.find({ roles: "evaluator" });
+
+      if (evaluators.length === 0) {
+        return res.status(400).json({ error: "No evaluators available" });
+      }
+
+      // Get workload for each evaluator (pending evaluations)
+      const evaluatorWorkload = await Promise.all(
+        evaluators.map(async (evaluator) => {
+          const pendingCount = await Evaluation.countDocuments({
+            evaluatorId: evaluator._id,
+            status: "pending",
+          });
+          return {
+            id: evaluator._id.toString(),
+            name: evaluator.fullName,
+            workload: pendingCount,
+          };
+        })
+      );
+
+      // Sort by workload (min heap simulation)
+      evaluatorWorkload.sort((a, b) => a.workload - b.workload);
+
+      // Assign to evaluator with least workload (max 3 at a time)
+      const availableEvaluators = evaluatorWorkload.filter(
+        (e) => e.workload < 3
+      );
+
+      if (availableEvaluators.length === 0) {
+        return res.status(400).json({
+          error:
+            "All evaluators are at maximum capacity (3 pending evaluations each). Please wait or assign manually.",
+        });
+      }
+
+      // Assign to the one with least workload
+      finalEvaluatorIds = [availableEvaluators[0].id];
+
+      console.log(
+        `Auto-assigned to ${availableEvaluators[0].name} (current workload: ${availableEvaluators[0].workload})`
+      );
+    }
+
     // Verify all evaluators exist and have evaluator role
     const evaluators = await User.find({
-      _id: { $in: evaluatorIds },
+      _id: { $in: finalEvaluatorIds },
       roles: "evaluator",
     });
 
-    if (evaluators.length !== evaluatorIds.length) {
+    if (evaluators.length !== finalEvaluatorIds.length) {
       return res.status(400).json({
         error:
           "One or more invalid evaluator IDs or users without evaluator role",
@@ -237,14 +287,14 @@ exports.assignEvaluators = async (req, res, next) => {
     }
 
     // Update idea
-    idea.assignedEvaluators = evaluatorIds;
+    idea.assignedEvaluators = finalEvaluatorIds;
     if (idea.status === "submitted") {
       idea.status = "under_review";
     }
     await idea.save();
 
     // Create evaluation records for new evaluators
-    for (const evaluatorId of evaluatorIds) {
+    for (const evaluatorId of finalEvaluatorIds) {
       const existingEvaluation = await Evaluation.findOne({
         ideaId: id,
         evaluatorId,
@@ -271,12 +321,51 @@ exports.assignEvaluators = async (req, res, next) => {
     }
 
     res.json({
-      message: "Evaluators assigned successfully",
+      message: autoAssign
+        ? `Idea automatically assigned to evaluator with least workload`
+        : "Evaluators assigned successfully",
       idea: await Idea.findById(id).populate(
         "assignedEvaluators",
         "fullName email"
       ),
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Get evaluator workload
+exports.getEvaluatorWorkload = async (req, res, next) => {
+  try {
+    const evaluators = await User.find({ roles: "evaluator" });
+
+    const workload = await Promise.all(
+      evaluators.map(async (evaluator) => {
+        const pending = await Evaluation.countDocuments({
+          evaluatorId: evaluator._id,
+          status: "pending",
+        });
+        const completed = await Evaluation.countDocuments({
+          evaluatorId: evaluator._id,
+          status: "completed",
+        });
+
+        return {
+          id: evaluator._id,
+          name: evaluator.fullName,
+          email: evaluator.email,
+          pending,
+          completed,
+          total: pending + completed,
+          available: pending < 3,
+        };
+      })
+    );
+
+    // Sort by pending workload
+    workload.sort((a, b) => a.pending - b.pending);
+
+    res.json({ workload });
   } catch (error) {
     next(error);
   }
@@ -422,3 +511,5 @@ exports.deleteUser = async (req, res, next) => {
     next(error);
   }
 };
+
+module.exports = exports;
