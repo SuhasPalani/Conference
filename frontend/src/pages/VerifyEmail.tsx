@@ -6,29 +6,24 @@ import { authAPI } from '@/services/api';
 export default function VerifyEmail() {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
-  const [status, setStatus] = useState<'verifying' | 'success' | 'error' | 'already-verified'>('verifying');
+  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    if (!token) {
-      setStatus('error');
-      setMessage('No verification token provided');
-      return;
-    }
-
     const verifyEmail = async () => {
+      if (!token) {
+        setStatus('error');
+        setMessage('Invalid verification link');
+        return;
+      }
+
       try {
         const response = await authAPI.verifyEmail(token);
-        const data = response.data;
         
-        if (data.success) {
-          if (data.alreadyVerified) {
-            setStatus('already-verified');
-            setMessage('Your email is already verified. You can login now.');
-          } else {
-            setStatus('success');
-            setMessage('Email verified successfully! You can now login.');
-          }
+        // Check if response indicates success
+        if (response.data?.success) {
+          setStatus('success');
+          setMessage(response.data.message || 'Email verified successfully!');
           
           // Redirect to login after 3 seconds
           setTimeout(() => {
@@ -36,14 +31,13 @@ export default function VerifyEmail() {
           }, 3000);
         } else {
           setStatus('error');
-          setMessage(data.error || 'Verification failed');
+          setMessage(response.data?.error || 'Verification failed');
         }
       } catch (error: any) {
-        console.error('Verification error:', error);
         setStatus('error');
         setMessage(
           error.response?.data?.error || 
-          'Verification failed. The link may be invalid or expired.'
+          'Verification failed. The link may be expired or invalid.'
         );
       }
     };
@@ -59,12 +53,12 @@ export default function VerifyEmail() {
           <span className="text-3xl font-bold text-gradient">mAIple</span>
         </Link>
 
-        <div className="glass-morphism rounded-2xl p-8 card-glow text-center">
-          {status === 'verifying' && (
+        <div className="glass-morphism rounded-2xl p-8 text-center">
+          {status === 'loading' && (
             <>
-              <div className="animate-spin rounded-full h-16 w-16 border-4 border-orange-500 border-t-transparent mx-auto mb-4"></div>
+              <div className="animate-spin rounded-full h-16 w-16 border-4 border-orange-500 border-t-transparent mx-auto mb-4" />
               <h2 className="text-2xl font-bold text-white mb-2">Verifying Email...</h2>
-              <p className="text-gray-400">Please wait while we verify your email address.</p>
+              <p className="text-gray-400">Please wait while we verify your account</p>
             </>
           )}
 
@@ -72,15 +66,6 @@ export default function VerifyEmail() {
             <>
               <div className="text-6xl mb-4">✅</div>
               <h2 className="text-2xl font-bold text-white mb-2">Email Verified!</h2>
-              <p className="text-gray-400 mb-6">{message}</p>
-              <p className="text-sm text-gray-500">Redirecting to login...</p>
-            </>
-          )}
-
-          {status === 'already-verified' && (
-            <>
-              <div className="text-6xl mb-4">✓</div>
-              <h2 className="text-2xl font-bold text-white mb-2">Already Verified</h2>
               <p className="text-gray-400 mb-6">{message}</p>
               <p className="text-sm text-gray-500">Redirecting to login...</p>
             </>

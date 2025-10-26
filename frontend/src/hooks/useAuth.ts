@@ -15,6 +15,7 @@ interface AuthState {
   token: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  isInitialized: boolean; // NEW: Track if auth check is done
   login: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
   register: (email: string, password: string, fullName: string) => Promise<void>;
   logout: () => void;
@@ -22,11 +23,12 @@ interface AuthState {
   updateUser: (user: User) => void;
 }
 
-export const useAuth = create<AuthState>((set) => ({
+export const useAuth = create<AuthState>((set, get) => ({
   user: JSON.parse(localStorage.getItem('user') || 'null'),
   token: localStorage.getItem('token'),
   isLoading: false,
   isAuthenticated: !!localStorage.getItem('token'),
+  isInitialized: false, // NEW
 
   login: async (email, password, rememberMe = false) => {
     set({ isLoading: true });
@@ -34,7 +36,13 @@ export const useAuth = create<AuthState>((set) => ({
       const { data } = await authAPI.login({ email, password, rememberMe });
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
-      set({ user: data.user, token: data.token, isAuthenticated: true, isLoading: false });
+      set({ 
+        user: data.user, 
+        token: data.token, 
+        isAuthenticated: true, 
+        isLoading: false,
+        isInitialized: true 
+      });
     } catch (error: any) {
       set({ isLoading: false });
       throw error;
@@ -55,24 +63,34 @@ export const useAuth = create<AuthState>((set) => ({
   logout: () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    set({ user: null, token: null, isAuthenticated: false });
+    set({ user: null, token: null, isAuthenticated: false, isInitialized: true });
   },
 
   checkAuth: async () => {
     const token = localStorage.getItem('token');
+    
     if (!token) {
-      set({ isAuthenticated: false, user: null });
+      set({ isAuthenticated: false, user: null, isInitialized: true });
       return;
     }
 
     try {
       const { data } = await authAPI.getMe();
       localStorage.setItem('user', JSON.stringify(data.user));
-      set({ user: data.user, isAuthenticated: true });
+      set({ 
+        user: data.user, 
+        isAuthenticated: true,
+        isInitialized: true 
+      });
     } catch (error) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      set({ user: null, token: null, isAuthenticated: false });
+      set({ 
+        user: null, 
+        token: null, 
+        isAuthenticated: false,
+        isInitialized: true 
+      });
     }
   },
 

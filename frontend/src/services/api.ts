@@ -11,15 +11,35 @@ const api = axios.create({
 });
 
 // Request interceptor
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+
+    // If token expired and we haven't retried yet
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      try {
+        const token = localStorage.getItem('token');
+        if (token) {
+          const { data } = await api.post('/auth/refresh-token', { token });
+          localStorage.setItem('token', data.token);
+          api.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
+          originalRequest.headers['Authorization'] = `Bearer ${data.token}`;
+          return api(originalRequest);
+        }
+      } catch (refreshError) {
+        // Token refresh failed, logout user
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+        return Promise.reject(refreshError);
+      }
     }
-    return config;
-  },
-  (error) => Promise.reject(error)
+
+    return Promise.reject(error);
+  }
 );
 
 // Response interceptor
@@ -44,7 +64,8 @@ export const authAPI = {
   forgotPassword: (email: string) => api.post('/auth/forgot-password', { email }),
   resetPassword: (token: string, password: string) => 
     api.post(`/auth/reset-password/${token}`, { password }),
-  verifyEmail: (token: string) => api.get(`/auth/verify-email/${token}`),
+  verifyEmail: (token: string) => 
+    api.get(`/auth/verify-email/${token}`),
   resendVerification: (email: string) => 
     api.post('/auth/resend-verification', { email }),
 };

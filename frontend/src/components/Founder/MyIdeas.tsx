@@ -33,8 +33,15 @@ export default function MyIdeas() {
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) => ideaAPI.update(id, data),
-    onSuccess: () => {
-      addToast('Idea updated successfully!', 'success');
+    onSuccess: (response, variables) => {
+      const updatedIdea = ideas.find((i: any) => i._id === variables.id);
+      
+      if (updatedIdea && ['submitted', 'under_review'].includes(updatedIdea.status)) {
+        addToast('Idea updated! Admin and evaluators have been notified.', 'success');
+      } else {
+        addToast('Idea updated successfully!', 'success');
+      }
+      
       queryClient.invalidateQueries({ queryKey: ['myIdeas'] });
       setIsEditing(false);
       setEditFormData(null);
@@ -68,7 +75,10 @@ export default function MyIdeas() {
     return colors[status] || 'bg-gray-700 text-gray-300';
   };
 
-  const canEdit = (status: string) => ['draft', 'rejected'].includes(status);
+  // ✅ CHANGED: Allow editing for draft, rejected, submitted, and under_review
+  const canEdit = (status: string) => ['draft', 'rejected', 'submitted', 'under_review'].includes(status);
+  
+  // ✅ CHANGED: Only allow deletion for draft and rejected
   const canDelete = (status: string) => ['draft', 'rejected'].includes(status);
 
   const handleEdit = (idea: any) => {
@@ -100,7 +110,7 @@ export default function MyIdeas() {
 
   return (
     <div className="space-y-6">
-      <div className="glass-morph rounded-xl p-6">
+      <div className="glass-morphism rounded-xl p-6">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold text-white">Your Ideas</h2>
           <span className="px-3 py-1 bg-orange-900/30 text-orange-300 rounded-full text-sm font-semibold">
@@ -175,6 +185,15 @@ export default function MyIdeas() {
                   </div>
                 )}
 
+                {/* ✅ CHANGED: Show edit button for submitted/under_review with warning */}
+                {['submitted', 'under_review'].includes(idea.status) && (
+                  <div className="mb-3 p-2 bg-yellow-900/20 border border-yellow-700/50 rounded-lg">
+                    <p className="text-xs text-yellow-300">
+                      ⚠️ This idea is under review. Editing will notify admin and evaluators.
+                    </p>
+                  </div>
+                )}
+
                 <div className="flex gap-2 flex-wrap">
                   <button
                     onClick={() => {
@@ -228,19 +247,29 @@ export default function MyIdeas() {
       {/* View/Edit Details Modal */}
       {selectedIdea && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="glass-morph rounded-2xl p-8 max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="glass-morphism rounded-2xl p-8 max-w-3xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-start justify-between mb-6">
               <div className="flex-1">
                 {isEditing ? (
-                  <input
-                    type="text"
-                    title="Title"
-                    placeholder="Idea title"
-                    value={editFormData.title}
-                    onChange={(e) => setEditFormData({ ...editFormData, title: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white text-2xl font-bold mb-2"
-                    maxLength={100}
-                  />
+                  <>
+                    <input
+                      type="text"
+                      title="Title"
+                      placeholder="Idea title"
+                      value={editFormData.title}
+                      onChange={(e) => setEditFormData({ ...editFormData, title: e.target.value })}
+                      className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white text-2xl font-bold mb-2"
+                      maxLength={100}
+                    />
+                    {/* ✅ NEW: Warning for submitted/under_review */}
+                    {['submitted', 'under_review'].includes(selectedIdea.status) && (
+                      <div className="mb-3 p-3 bg-yellow-900/20 border border-yellow-700 rounded-lg">
+                        <p className="text-sm text-yellow-300">
+                          ⚠️ <strong>Note:</strong> This idea is currently under review. Saving changes will notify the admin and assigned evaluators about the update.
+                        </p>
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <h2 className="text-3xl font-bold text-white mb-2">{selectedIdea.title}</h2>
                 )}
@@ -265,65 +294,73 @@ export default function MyIdeas() {
             </div>
 
             <div className="space-y-6">
-              <h3 className="text-xl font-semibold text-white mt-4 border-b border-gray-700 pb-2">Abstract</h3>
-              {isEditing ? (
-                <textarea
-                  title="Abstract"
-                  placeholder="Brief abstract (max 500 chars)"
-                  value={editFormData.abstract}
-                  onChange={(e) => setEditFormData({ ...editFormData, abstract: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white"
-                  rows={3}
-                  maxLength={500}
-                />
-              ) : (
-                <p className="text-gray-300 whitespace-pre-wrap">{selectedIdea.abstract}</p>
-              )}
+              <div>
+                <h3 className="text-xl font-semibold text-white mb-2 border-b border-gray-700 pb-2">Abstract</h3>
+                {isEditing ? (
+                  <textarea
+                    title="Abstract"
+                    placeholder="Brief abstract (max 500 chars)"
+                    value={editFormData.abstract}
+                    onChange={(e) => setEditFormData({ ...editFormData, abstract: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white"
+                    rows={3}
+                    maxLength={500}
+                  />
+                ) : (
+                  <p className="text-gray-300 whitespace-pre-wrap">{selectedIdea.abstract}</p>
+                )}
+              </div>
 
-              <h3 className="text-xl font-semibold text-white mt-4 border-b border-gray-700 pb-2">Problem</h3>
-              {isEditing ? (
-                <textarea
-                  title="Problem"
-                  placeholder="Describe the problem your idea addresses"
-                  value={editFormData.problem}
-                  onChange={(e) => setEditFormData({ ...editFormData, problem: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white"
-                  rows={4}
-                  maxLength={1000}
-                />
-              ) : (
-                <p className="text-gray-300 whitespace-pre-wrap">{selectedIdea.problem}</p>
-              )}
+              <div>
+                <h3 className="text-xl font-semibold text-white mb-2 border-b border-gray-700 pb-2">Problem</h3>
+                {isEditing ? (
+                  <textarea
+                    title="Problem"
+                    placeholder="Describe the problem your idea addresses"
+                    value={editFormData.problem}
+                    onChange={(e) => setEditFormData({ ...editFormData, problem: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white"
+                    rows={4}
+                    maxLength={1000}
+                  />
+                ) : (
+                  <p className="text-gray-300 whitespace-pre-wrap">{selectedIdea.problem}</p>
+                )}
+              </div>
 
-              <h3 className="text-xl font-semibold text-white mt-4 border-b border-gray-700 pb-2">Solution</h3>
-              {isEditing ? (
-                <textarea
-                  title="Solution"
-                  placeholder="Explain your solution"
-                  value={editFormData.solution}
-                  onChange={(e) => setEditFormData({ ...editFormData, solution: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white"
-                  rows={4}
-                  maxLength={1000}
-                />
-              ) : (
-                <p className="text-gray-300 whitespace-pre-wrap">{selectedIdea.solution}</p>
-              )}
+              <div>
+                <h3 className="text-xl font-semibold text-white mb-2 border-b border-gray-700 pb-2">Solution</h3>
+                {isEditing ? (
+                  <textarea
+                    title="Solution"
+                    placeholder="Explain your solution"
+                    value={editFormData.solution}
+                    onChange={(e) => setEditFormData({ ...editFormData, solution: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white"
+                    rows={4}
+                    maxLength={1000}
+                  />
+                ) : (
+                  <p className="text-gray-300 whitespace-pre-wrap">{selectedIdea.solution}</p>
+                )}
+              </div>
 
-              <h3 className="text-xl font-semibold text-white mt-4 border-b border-gray-700 pb-2">Team</h3>
-              {isEditing ? (
-                <textarea
-                  title="Team"
-                  placeholder="Team details or collaborators"
-                  value={editFormData.team}
-                  onChange={(e) => setEditFormData({ ...editFormData, team: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white"
-                  rows={3}
-                  maxLength={500}
-                />
-              ) : (
-                <p className="text-gray-300 whitespace-pre-wrap">{selectedIdea.team}</p>
-              )}
+              <div>
+                <h3 className="text-xl font-semibold text-white mb-2 border-b border-gray-700 pb-2">Team</h3>
+                {isEditing ? (
+                  <textarea
+                    title="Team"
+                    placeholder="Team details or collaborators"
+                    value={editFormData.team}
+                    onChange={(e) => setEditFormData({ ...editFormData, team: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white"
+                    rows={3}
+                    maxLength={500}
+                  />
+                ) : (
+                  <p className="text-gray-300 whitespace-pre-wrap">{selectedIdea.team}</p>
+                )}
+              </div>
 
               {selectedIdea.averageScore && (
                 <div className="p-4 gradient-dark rounded-lg">

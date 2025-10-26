@@ -1,4 +1,5 @@
 // FILE: backend/src/controllers/ideaController.js
+// FILE: backend/src/controllers/ideaController.js
 const Idea = require("../models/Idea");
 const Evaluation = require("../models/Evaluation");
 const User = require("../models/User");
@@ -20,27 +21,68 @@ exports.saveIdea = async (req, res, next) => {
         return res.status(404).json({ error: "Idea not found" });
       }
 
-      // Can only edit draft or rejected ideas
-      if (!["draft", "rejected"].includes(idea.status)) {
+      // ✅ CHANGED: Allow editing in more states, but with notifications
+      const editableStatuses = ['draft', 'rejected', 'submitted', 'under_review'];
+      if (!editableStatuses.includes(idea.status)) {
         return res.status(400).json({
-          error:
-            "Cannot edit ideas that are submitted, under review, or approved. You can only edit draft or rejected ideas.",
+          error: "Cannot edit approved ideas. Please contact admin if changes are needed.",
         });
       }
 
+      // Store old values for comparison
+      const oldValues = {
+        title: idea.title,
+        abstract: idea.abstract,
+        problem: idea.problem,
+        solution: idea.solution,
+        team: idea.team,
+      };
+
+      // Update fields
       idea.title = title || idea.title;
       idea.abstract = abstract || idea.abstract;
       idea.problem = problem || idea.problem;
       idea.solution = solution || idea.solution;
       idea.team = team || idea.team;
 
-      // Reset status to draft if it was rejected
-      if (idea.status === "rejected") {
-        idea.status = "draft";
-        idea.submittedAt = null;
-        idea.assignedEvaluators = [];
-        idea.averageScore = null;
-        idea.evaluationCount = 0;
+      // ✅ NEW: If idea was submitted/under_review and content changed, notify admin and evaluators
+      if (['submitted', 'under_review'].includes(idea.status)) {
+        const hasChanges = 
+          oldValues.title !== idea.title ||
+          oldValues.abstract !== idea.abstract ||
+          oldValues.problem !== idea.problem ||
+          oldValues.solution !== idea.solution ||
+          oldValues.team !== idea.team;
+
+        if (hasChanges) {
+          // Notify admin about changes
+          const admins = await User.find({ roles: 'admin' });
+          for (const admin of admins) {
+            await emailService.sendIdeaUpdatedNotification(
+              admin.email,
+              admin.fullName,
+              idea.title,
+              req.user.fullName,
+              idea._id
+            );
+          }
+
+          // Notify assigned evaluators
+          if (idea.assignedEvaluators && idea.assignedEvaluators.length > 0) {
+            const evaluators = await User.find({ 
+              _id: { $in: idea.assignedEvaluators } 
+            });
+            
+            for (const evaluator of evaluators) {
+              await emailService.sendIdeaUpdatedToEvaluator(
+                evaluator.email,
+                evaluator.fullName,
+                idea.title,
+                idea._id
+              );
+            }
+          }
+        }
       }
 
       await idea.save();
@@ -65,6 +107,8 @@ exports.saveIdea = async (req, res, next) => {
     next(error);
   }
 };
+
+
 
 // Submit idea for review
 exports.submitIdea = async (req, res, next) => {

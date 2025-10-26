@@ -16,7 +16,16 @@ import Admin from './pages/Admin';
 import NotFound from './pages/NotFound';
 
 function ProtectedRoute({ children, roles }: { children: React.ReactNode; roles?: string[] }) {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, isInitialized } = useAuth();
+
+  // Show loading while checking auth
+  if (!isInitialized) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-4 border-orange-500 border-t-transparent" />
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
@@ -30,11 +39,20 @@ function ProtectedRoute({ children, roles }: { children: React.ReactNode; roles?
 }
 
 function App() {
-  const { checkAuth } = useAuth();
+  const { checkAuth, isInitialized } = useAuth();
 
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
+
+  // Show loading screen while checking auth
+  if (!isInitialized) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-4 border-orange-500 border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
     <BrowserRouter>

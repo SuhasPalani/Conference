@@ -112,26 +112,40 @@ exports.sendPasswordResetEmail = async (email, fullName, token) => {
 };
 
 // Idea submission confirmation
-exports.sendIdeaSubmittedEmail = async (email, fullName, ideaTitle) => {
-  const subject = "Idea Submitted Successfully!";
+exports.sendIdeaUpdatedNotification = async (
+  adminEmail,
+  adminName,
+  ideaTitle,
+  founderName,
+  ideaId
+) => {
+  const subject = "Idea Updated - Review Required";
+  const ideaUrl = `${emailConfig.frontendUrl}/admin?tab=ideas&id=${ideaId}`;
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <h1 style="color: #ff6b35;">Idea Submitted! 💡</h1>
-      <p>Hi ${fullName},</p>
-      <p>Your idea "<strong>${ideaTitle}</strong>" has been successfully submitted for review.</p>
-      <p><strong>What happens next?</strong></p>
-      <ol>
-        <li>Our admin will assign expert evaluators to your submission</li>
-        <li>Evaluators will review your idea and provide scores</li>
-        <li>You'll receive feedback and final decision within 5-7 business days</li>
-        <li>You'll be notified at each step of the process</li>
-      </ol>
-      <p>You can track your submission status in your dashboard: <a href="${emailConfig.frontendUrl}/dashboard">View Dashboard</a></p>
-      <p>Good luck! 🌟</p>
-      <p>Best regards,<br>The mAIple Team</p>
+      <h1 style="color: #ff6b35;">Idea Updated 📝</h1>
+      <p>Hi ${adminName},</p>
+      <p>An idea that is currently under review has been updated:</p>
+      <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
+        <h3 style="margin: 0;">${ideaTitle}</h3>
+        <p style="margin: 5px 0;">by ${founderName}</p>
+      </div>
+      <p>The founder has made changes to the submission. Please review the updates.</p>
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="${ideaUrl}" 
+           style="background: linear-gradient(135deg, #ff6b35 0%, #e84118 100%); 
+                  color: white; 
+                  padding: 12px 30px; 
+                  text-decoration: none; 
+                  border-radius: 5px;
+                  display: inline-block;">
+          Review Updated Idea
+        </a>
+      </div>
+      <p>Best regards,<br>mAIple System</p>
     </div>
   `;
-  return await sendEmail(email, subject, html);
+  return await sendEmail(adminEmail, subject, html);
 };
 
 // New submission notification to admin
@@ -306,6 +320,40 @@ exports.sendIdeaStatusChangedEmail = async (
     </div>
   `;
   return await sendEmail(email, subject, html);
+};
+
+exports.sendIdeaUpdatedToEvaluator = async (
+  evaluatorEmail,
+  evaluatorName,
+  ideaTitle,
+  ideaId
+) => {
+  const subject = "Assigned Idea Has Been Updated";
+  const evaluateUrl = `${emailConfig.frontendUrl}/evaluate?id=${ideaId}`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h1 style="color: #ff6b35;">Idea Updated 📝</h1>
+      <p>Hi ${evaluatorName},</p>
+      <p>An idea assigned to you has been updated by the founder:</p>
+      <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
+        <h3 style="margin: 0;">${ideaTitle}</h3>
+      </div>
+      <p>Please review the changes and update your evaluation if necessary.</p>
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="${evaluateUrl}" 
+           style="background: linear-gradient(135deg, #ff6b35 0%, #e84118 100%); 
+                  color: white; 
+                  padding: 12px 30px; 
+                  text-decoration: none; 
+                  border-radius: 5px;
+                  display: inline-block;">
+          Review Updated Idea
+        </a>
+      </div>
+      <p>Best regards,<br>The mAIple Team</p>
+    </div>
+  `;
+  return await sendEmail(evaluatorEmail, subject, html);
 };
 
 // Role assignment notification
