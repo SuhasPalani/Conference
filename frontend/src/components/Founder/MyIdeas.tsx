@@ -75,10 +75,7 @@ export default function MyIdeas() {
     return colors[status] || 'bg-gray-700 text-gray-300';
   };
 
-  // ✅ CHANGED: Allow editing for draft, rejected, submitted, and under_review
   const canEdit = (status: string) => ['draft', 'rejected', 'submitted', 'under_review'].includes(status);
-  
-  // ✅ CHANGED: Only allow deletion for draft and rejected
   const canDelete = (status: string) => ['draft', 'rejected'].includes(status);
 
   const handleEdit = (idea: any) => {
@@ -184,8 +181,6 @@ export default function MyIdeas() {
                     ))}
                   </div>
                 )}
-
-                {/* ✅ CHANGED: Show edit button for submitted/under_review with warning */}
                 {['submitted', 'under_review'].includes(idea.status) && (
                   <div className="mb-3 p-2 bg-yellow-900/20 border border-yellow-700/50 rounded-lg">
                     <p className="text-xs text-yellow-300">
@@ -244,7 +239,7 @@ export default function MyIdeas() {
         )}
       </div>
 
-      {/* View/Edit Details Modal */}
+      {/* View/Edit Modal - FIXED: Now properly displays all fields */}
       {selectedIdea && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="glass-morphism rounded-2xl p-8 max-w-3xl w-full max-h-[90vh] overflow-y-auto">
@@ -254,18 +249,16 @@ export default function MyIdeas() {
                   <>
                     <input
                       type="text"
-                      title="Title"
-                      placeholder="Idea title"
                       value={editFormData.title}
                       onChange={(e) => setEditFormData({ ...editFormData, title: e.target.value })}
+                      placeholder="Idea Title"
                       className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white text-2xl font-bold mb-2"
                       maxLength={100}
                     />
-                    {/* ✅ NEW: Warning for submitted/under_review */}
                     {['submitted', 'under_review'].includes(selectedIdea.status) && (
                       <div className="mb-3 p-3 bg-yellow-900/20 border border-yellow-700 rounded-lg">
                         <p className="text-sm text-yellow-300">
-                          ⚠️ <strong>Note:</strong> This idea is currently under review. Saving changes will notify the admin and assigned evaluators about the update.
+                          ⚠️ <strong>Note:</strong> This idea is currently under review. Saving changes will notify the admin and assigned evaluators.
                         </p>
                       </div>
                     )}
@@ -294,74 +287,75 @@ export default function MyIdeas() {
             </div>
 
             <div className="space-y-6">
+              {/* Abstract */}
               <div>
-                <h3 className="text-xl font-semibold text-white mb-2 border-b border-gray-700 pb-2">Abstract</h3>
+                <h3 className="text-sm font-semibold text-gray-400 mb-2">ABSTRACT</h3>
                 {isEditing ? (
                   <textarea
-                    title="Abstract"
-                    placeholder="Brief abstract (max 500 chars)"
                     value={editFormData.abstract}
                     onChange={(e) => setEditFormData({ ...editFormData, abstract: e.target.value })}
+                    placeholder="Enter abstract"
                     className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white"
                     rows={3}
                     maxLength={500}
                   />
                 ) : (
-                  <p className="text-gray-300 whitespace-pre-wrap">{selectedIdea.abstract}</p>
+                  <p className="text-white whitespace-pre-wrap">{selectedIdea.abstract}</p>
                 )}
               </div>
 
+              {/* Problem */}
               <div>
-                <h3 className="text-xl font-semibold text-white mb-2 border-b border-gray-700 pb-2">Problem</h3>
+                <h3 className="text-sm font-semibold text-gray-400 mb-2">PROBLEM</h3>
                 {isEditing ? (
                   <textarea
-                    title="Problem"
-                    placeholder="Describe the problem your idea addresses"
                     value={editFormData.problem}
                     onChange={(e) => setEditFormData({ ...editFormData, problem: e.target.value })}
+                    placeholder="Enter problem"
                     className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white"
                     rows={4}
                     maxLength={1000}
                   />
                 ) : (
-                  <p className="text-gray-300 whitespace-pre-wrap">{selectedIdea.problem}</p>
+                  <p className="text-white whitespace-pre-wrap">{selectedIdea.problem}</p>
                 )}
               </div>
 
+              {/* Solution */}
               <div>
-                <h3 className="text-xl font-semibold text-white mb-2 border-b border-gray-700 pb-2">Solution</h3>
+                <h3 className="text-sm font-semibold text-gray-400 mb-2">SOLUTION</h3>
                 {isEditing ? (
                   <textarea
-                    title="Solution"
-                    placeholder="Explain your solution"
                     value={editFormData.solution}
                     onChange={(e) => setEditFormData({ ...editFormData, solution: e.target.value })}
+                    placeholder="Enter solution"
                     className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white"
                     rows={4}
                     maxLength={1000}
                   />
                 ) : (
-                  <p className="text-gray-300 whitespace-pre-wrap">{selectedIdea.solution}</p>
+                  <p className="text-white whitespace-pre-wrap">{selectedIdea.solution}</p>
                 )}
               </div>
 
+              {/* Team */}
               <div>
-                <h3 className="text-xl font-semibold text-white mb-2 border-b border-gray-700 pb-2">Team</h3>
+                <h3 className="text-sm font-semibold text-gray-400 mb-2">TEAM</h3>
                 {isEditing ? (
                   <textarea
-                    title="Team"
-                    placeholder="Team details or collaborators"
                     value={editFormData.team}
                     onChange={(e) => setEditFormData({ ...editFormData, team: e.target.value })}
+                    placeholder="Enter team details"
                     className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white"
                     rows={3}
                     maxLength={500}
                   />
                 ) : (
-                  <p className="text-gray-300 whitespace-pre-wrap">{selectedIdea.team}</p>
+                  <p className="text-white whitespace-pre-wrap">{selectedIdea.team}</p>
                 )}
               </div>
 
+              {/* Scores */}
               {selectedIdea.averageScore && (
                 <div className="p-4 gradient-dark rounded-lg">
                   <div className="flex justify-between items-center">
@@ -370,9 +364,9 @@ export default function MyIdeas() {
                       {selectedIdea.averageScore}/10
                     </span>
                   </div>
-                  {selectedIdea.evaluations && selectedIdea.evaluations.length > 0 && (
+                  {selectedIdea.evaluationCount > 0 && (
                     <p className="text-sm text-gray-400 mt-2">
-                      Based on {selectedIdea.evaluationCount} evaluations.
+                      Based on {selectedIdea.evaluationCount} evaluation(s)
                     </p>
                   )}
                 </div>
@@ -384,7 +378,6 @@ export default function MyIdeas() {
               {isEditing ? (
                 <>
                   <button
-                    type="button"
                     onClick={() => {
                       setIsEditing(false);
                       setEditFormData(null);
@@ -394,7 +387,6 @@ export default function MyIdeas() {
                     Cancel
                   </button>
                   <button
-                    type="button"
                     onClick={handleUpdate}
                     disabled={updateMutation.isPending}
                     className="flex-1 py-3 gradient-primary text-white rounded-lg font-semibold hover:opacity-90 transition-all disabled:opacity-50"
@@ -404,7 +396,6 @@ export default function MyIdeas() {
                 </>
               ) : (
                 <button
-                  type="button"
                   onClick={() => {
                     setSelectedIdea(null);
                     setIsEditing(false);

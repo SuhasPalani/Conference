@@ -307,16 +307,24 @@ exports.assignEvaluators = async (req, res, next) => {
           status: "pending",
         });
 
-        // Send notification email
+        // ✅ FIX: Convert _id to string for email
         const evaluator = evaluators.find(
           (e) => e._id.toString() === evaluatorId
         );
-        await emailService.sendIdeaAssignedEmail(
-          evaluator.email,
-          evaluator.fullName,
-          idea.title,
-          idea._id
-        );
+
+        if (evaluator) {
+          try {
+            await emailService.sendIdeaAssignedEmail(
+              evaluator.email,
+              evaluator.fullName,
+              idea.title,
+              idea._id.toString() // ✅ FIXED: Convert ObjectId to string
+            );
+          } catch (emailError) {
+            console.error("Failed to send assignment email:", emailError);
+            // Don't fail the whole operation if email fails
+          }
+        }
       }
     }
 
