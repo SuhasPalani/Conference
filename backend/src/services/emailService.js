@@ -111,7 +111,44 @@ exports.sendPasswordResetEmail = async (email, fullName, token) => {
   return await sendEmail(email, subject, html);
 };
 
-// Idea submission confirmation
+// ✅ NEW: Idea submission confirmation to founder
+exports.sendIdeaSubmittedEmail = async (email, fullName, ideaTitle) => {
+  const subject = "Idea Submitted Successfully - mAIple Conference";
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h1 style="color: #ff6b35;">Idea Submitted! 🚀</h1>
+      <p>Hi ${fullName},</p>
+      <p>Your idea has been successfully submitted for review:</p>
+      <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
+        <h3 style="margin: 0; color: #333;">${ideaTitle}</h3>
+      </div>
+      <p>What happens next:</p>
+      <ul style="color: #666;">
+        <li>Our admin team will review your submission</li>
+        <li>Evaluators will be assigned to review your idea</li>
+        <li>You'll receive feedback and scores from expert evaluators</li>
+        <li>Top ideas will be selected for the pitch competition</li>
+      </ul>
+      <p>You can track your submission progress in your dashboard:</p>
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="${emailConfig.frontendUrl}/dashboard" 
+           style="background: linear-gradient(135deg, #ff6b35 0%, #e84118 100%); 
+                  color: white; 
+                  padding: 12px 30px; 
+                  text-decoration: none; 
+                  border-radius: 5px;
+                  display: inline-block;">
+          View Dashboard
+        </a>
+      </div>
+      <p>Thank you for sharing your innovation with us!</p>
+      <p>Best regards,<br>The mAIple Team</p>
+    </div>
+  `;
+  return await sendEmail(email, subject, html);
+};
+
+// Idea updated notification to admin
 exports.sendIdeaUpdatedNotification = async (
   adminEmail,
   adminName,
@@ -322,6 +359,7 @@ exports.sendIdeaStatusChangedEmail = async (
   return await sendEmail(email, subject, html);
 };
 
+// Idea updated notification to evaluator
 exports.sendIdeaUpdatedToEvaluator = async (
   evaluatorEmail,
   evaluatorName,
