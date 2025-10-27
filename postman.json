@@ -1,7 +1,7 @@
 {
   "info": {
-    "name": "mAIple Conference Portal API",
-    "description": "Complete API collection for testing all endpoints",
+    "name": "mAIple Conference Portal API - Updated",
+    "description": "Complete API collection with OTP verification, role requests, and notifications",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -29,6 +29,16 @@
       "key": "evaluationId",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "notificationId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "requestId",
+      "value": "",
+      "type": "string"
     }
   ],
   "item": [
@@ -45,6 +55,7 @@
                   "if (pm.response.code === 201) {",
                   "    var jsonData = pm.response.json();",
                   "    pm.environment.set('userId', jsonData.user.id);",
+                  "    console.log('User registered. Check email for OTP.');",
                   "}"
                 ]
               }
@@ -66,6 +77,63 @@
               "raw": "{{baseUrl}}/auth/register",
               "host": ["{{baseUrl}}"],
               "path": ["auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Verify OTP",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.environment.set('token', jsonData.token);",
+                  "    pm.environment.set('userId', jsonData.user.id);",
+                  "    console.log('Email verified and logged in.');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"founder@test.com\",\n  \"otp\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/verify-otp",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "verify-otp"]
+            }
+          }
+        },
+        {
+          "name": "Resend OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"founder@test.com\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/resend-otp",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "resend-otp"]
             }
           }
         },
@@ -164,18 +232,6 @@
           }
         },
         {
-          "name": "Verify Email",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/auth/verify-email/YOUR_VERIFICATION_TOKEN_HERE",
-              "host": ["{{baseUrl}}"],
-              "path": ["auth", "verify-email", "YOUR_VERIFICATION_TOKEN_HERE"]
-            }
-          }
-        },
-        {
           "name": "Refresh Token",
           "request": {
             "method": "POST",
@@ -210,6 +266,215 @@
               "raw": "{{baseUrl}}/auth/logout",
               "host": ["{{baseUrl}}"],
               "path": ["auth", "logout"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Role Requests",
+      "item": [
+        {
+          "name": "Submit Role Request (Founder)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.environment.set('requestId', jsonData.roleRequest._id);",
+                  "    console.log('Role request submitted. Admin will review.');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"founder\",\n  \"reason\": \"I am a serial entrepreneur with 5 years of experience in AI/ML startups. I have successfully launched 2 products in the computer vision space and want to submit my latest innovation for evaluation. I believe my idea can revolutionize climate prediction.\",\n  \"previousWork\": \"Co-founder of VisionAI (acquired 2022), Technical Lead at DeepTech Solutions, Published 3 papers on neural networks. Portfolio: visionai.com, deeptech.io\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/role-requests",
+              "host": ["{{baseUrl}}"],
+              "path": ["role-requests"]
+            }
+          }
+        },
+        {
+          "name": "Submit Role Request (Evaluator)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"evaluator\",\n  \"reason\": \"I am a senior AI researcher with 10+ years of experience in machine learning and have served as a reviewer for top-tier conferences (NeurIPS, ICML, CVPR). I want to contribute to the community by evaluating innovative AI ideas and helping founders improve their proposals.\",\n  \"previousWork\": \"Senior Research Scientist at Google AI, PhD in Machine Learning from MIT, 50+ peer-reviewed publications, Program Committee member for NeurIPS 2023. Google Scholar: scholar.google.com/citations?user=xyz\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/role-requests",
+              "host": ["{{baseUrl}}"],
+              "path": ["role-requests"]
+            }
+          }
+        },
+        {
+          "name": "Get My Role Requests",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/role-requests/my",
+              "host": ["{{baseUrl}}"],
+              "path": ["role-requests", "my"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "Get My Notifications",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notifications?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Unread Notifications Only",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notifications?unreadOnly=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications"],
+              "query": [
+                {
+                  "key": "unreadOnly",
+                  "value": "true"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Unread Count",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/unread-count",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "unread-count"]
+            }
+          }
+        },
+        {
+          "name": "Mark Notification as Read",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/{{notificationId}}/read",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "{{notificationId}}", "read"]
+            }
+          }
+        },
+        {
+          "name": "Mark All as Read",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/mark-all-read",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "mark-all-read"]
+            }
+          }
+        },
+        {
+          "name": "Delete Notification",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/{{notificationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "{{notificationId}}"]
             }
           }
         }
@@ -319,7 +584,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Updated: AI-Powered Climate Prediction System\",\n  \"abstract\": \"Updated abstract with more details about our revolutionary approach.\"\n}"
+              "raw": "{\n  \"title\": \"Updated: AI-Powered Climate Prediction System\",\n  \"abstract\": \"Updated abstract with more details about our revolutionary approach.\",\n  \"problem\": \"Updated problem statement with more context.\",\n  \"solution\": \"Updated solution with technical details.\",\n  \"team\": \"Updated team information.\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/ideas/{{ideaId}}",
@@ -588,6 +853,123 @@
           }
         },
         {
+          "name": "Get All Role Requests",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/role-requests",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "role-requests"]
+            }
+          }
+        },
+        {
+          "name": "Get Pending Role Requests",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/role-requests?status=pending",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "role-requests"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "pending"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Founder Role Requests",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/role-requests?role=founder&status=pending",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "role-requests"],
+              "query": [
+                {
+                  "key": "role",
+                  "value": "founder"
+                },
+                {
+                  "key": "status",
+                  "value": "pending"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Approve Role Request",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"approve\",\n  \"reviewNotes\": \"Excellent credentials and clear motivation. Approved for founder role.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/role-requests/{{userId}}/{{requestId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "role-requests", "{{userId}}", "{{requestId}}"]
+            }
+          }
+        },
+        {
+          "name": "Reject Role Request",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"reject\",\n  \"reviewNotes\": \"Need more information about previous work and experience. Please reapply with portfolio links.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/role-requests/{{userId}}/{{requestId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "role-requests", "{{userId}}", "{{requestId}}"]
+            }
+          }
+        },
+        {
           "name": "Get All Users",
           "request": {
             "method": "GET",
@@ -657,7 +1039,7 @@
           }
         },
         {
-          "name": "Update User Roles",
+          "name": "Update User Roles (Manual)",
           "request": {
             "method": "PUT",
             "header": [
@@ -776,7 +1158,7 @@
           }
         },
         {
-          "name": "Assign Evaluators to Idea",
+          "name": "Assign Evaluators (Manual)",
           "request": {
             "method": "POST",
             "header": [
@@ -797,6 +1179,48 @@
               "raw": "{{baseUrl}}/admin/ideas/{{ideaId}}/assign",
               "host": ["{{baseUrl}}"],
               "path": ["admin", "ideas", "{{ideaId}}", "assign"]
+            }
+          }
+        },
+        {
+          "name": "Auto-Assign Evaluator (Queue System)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"autoAssign\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/ideas/{{ideaId}}/assign",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "ideas", "{{ideaId}}", "assign"]
+            }
+          }
+        },
+        {
+          "name": "Get Evaluator Workload",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/evaluators/workload",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "evaluators", "workload"]
             }
           }
         },

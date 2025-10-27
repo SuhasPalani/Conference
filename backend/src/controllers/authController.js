@@ -37,7 +37,7 @@ exports.register = async (req, res, next) => {
       return res.status(400).json({ error: "Email already registered" });
     }
 
-    // Create user - isVerified defaults to FALSE
+    // Create user as unverified basic user
     const user = await User.create({
       email,
       password,
@@ -46,19 +46,15 @@ exports.register = async (req, res, next) => {
       isVerified: false,
     });
 
-    // Generate verification token
-    const verificationToken = await Token.generateVerificationToken(user._id);
+    // Generate OTP
+    const otpToken = await Token.generateOTP(user._id);
 
-    // Send verification email
-    await emailService.sendVerificationEmail(
-      email,
-      fullName,
-      verificationToken.token
-    );
+    // Send OTP email
+    await emailService.sendOTPEmail(email, fullName, otpToken.token);
 
     res.status(201).json({
       message:
-        "Registration successful. Please check your email to verify your account.",
+        "Registration successful. Please check your email for OTP verification.",
       user: {
         id: user._id,
         email: user.email,
@@ -72,19 +68,111 @@ exports.register = async (req, res, next) => {
   }
 };
 
+// Verify OTP
+exports.verifyOTP = async (req, res, next) => {
+  try {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+      return res.status(400).json({ error: "Email and OTP are required" });
+    }
+
+    // Find user
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (user.isVerified) {
+      return res.status(400).json({ error: "Email already verified" });
+    }
+
+    // Verify OTP
+    const tokenDoc = await Token.verifyOTP(user._id, otp);
+
+    if (!tokenDoc) {
+      return res.status(400).json({
+        error: "Invalid or expired OTP. Please request a new one.",
+      });
+    }
+
+    // Mark user as verified
+    user.isVerified = true;
+    await user.save();
+
+    // Send welcome email
+    await emailService.sendWelcomeEmail(user.email, user.fullName);
+
+    // Generate auth token
+    const token = generateAccessToken(user._id);
+
+    res.json({
+      success: true,
+      message: "Email verified successfully! You can now login.",
+      token,
+      user: {
+        id: user._id,
+        email: user.email,
+        fullName: user.fullName,
+        roles: user.roles,
+        isVerified: user.isVerified,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Resend OTP
+exports.resendOTP = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
+    }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.json({
+        message: "If that email exists, a new OTP has been sent.",
+      });
+    }
+
+    if (user.isVerified) {
+      return res.status(400).json({ error: "Email is already verified" });
+    }
+
+    // Invalidate old OTPs
+    await Token.invalidateUserTokens(user._id, "otp_verification");
+
+    // Generate new OTP
+    const otpToken = await Token.generateOTP(user._id);
+
+    // Send OTP email
+    await emailService.sendOTPEmail(email, user.fullName, otpToken.token);
+
+    res.json({
+      message: "New OTP sent. Please check your email.",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Login user
 exports.login = async (req, res, next) => {
   try {
     const { email, password, rememberMe } = req.body;
 
-    // Validate input
     if (!email || !password) {
       return res
         .status(400)
         .json({ error: "Please provide email and password" });
     }
 
-    // Check if user exists and get password
+    // Check if user exists
     const user = await User.findOne({ email }).select("+password");
     if (!user) {
       return res.status(401).json({ error: "Invalid credentials" });
@@ -98,6 +186,11 @@ exports.login = async (req, res, next) => {
 
     // Check if email is verified
     if (!user.isVerified) {
+      // Resend OTP
+      await Token.invalidateUserTokens(user._id, "otp_verification");
+      const otpToken = await Token.generateOTP(user._id);
+      await emailService.sendOTPEmail(email, user.fullName, otpToken.token);
+
       return res.status(403).json({
         error: "Please verify your email address before logging in.",
         needsVerification: true,
@@ -108,7 +201,7 @@ exports.login = async (req, res, next) => {
     user.lastLogin = new Date();
     await user.save();
 
-    // Generate token with appropriate expiration
+    // Generate token
     const expiresIn = rememberMe
       ? process.env.JWT_REFRESH_EXPIRE
       : process.env.JWT_EXPIRE;
@@ -130,103 +223,6 @@ exports.login = async (req, res, next) => {
   }
 };
 
-// Verify email
-exports.verifyEmail = async (req, res, next) => {
-  try {
-    const { token } = req.params;
-
-    // Verify and use the token
-    const tokenDoc = await Token.verifyAndUseToken(token, "verification");
-
-    if (!tokenDoc) {
-      return res.status(400).json({
-        success: false,
-        error: "Invalid or expired verification token",
-      });
-    }
-
-    // Find user and verify
-    const user = await User.findById(tokenDoc.userId);
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: "User not found",
-      });
-    }
-
-    // Check if already verified
-    if (user.isVerified) {
-      return res.status(200).json({
-        success: true,
-        message: "Email already verified. You can now login.",
-        alreadyVerified: true,
-      });
-    }
-
-    // Set user as verified
-    user.isVerified = true;
-    await user.save();
-
-    // Send welcome email
-    await emailService.sendWelcomeEmail(user.email, user.fullName);
-
-    res.json({
-      success: true,
-      message: "Email verified successfully! You can now login.",
-    });
-  } catch (error) {
-    console.error("Verify email error:", error);
-    res.status(500).json({
-      success: false,
-      error: "Verification failed. Please try again or contact support.",
-    });
-  }
-};
-
-// Resend verification email
-exports.resendVerification = async (req, res, next) => {
-  try {
-    const { email } = req.body;
-
-    if (!email) {
-      return res.status(400).json({ error: "Email is required" });
-    }
-
-    const user = await User.findOne({ email });
-
-    if (!user) {
-      // Don't reveal if user exists
-      return res.json({
-        message:
-          "If that email exists and is not verified, a verification email has been sent.",
-      });
-    }
-
-    if (user.isVerified) {
-      return res.status(400).json({ error: "Email is already verified" });
-    }
-
-    // Invalidate old verification tokens
-    await Token.invalidateUserTokens(user._id, "verification");
-
-    // Generate new verification token
-    const verificationToken = await Token.generateVerificationToken(user._id);
-
-    // Send verification email
-    await emailService.sendVerificationEmail(
-      email,
-      user.fullName,
-      verificationToken.token
-    );
-
-    res.json({
-      message: "Verification email sent. Please check your inbox.",
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
 // Forgot password
 exports.forgotPassword = async (req, res, next) => {
   try {
@@ -235,7 +231,6 @@ exports.forgotPassword = async (req, res, next) => {
     const user = await User.findOne({ email });
 
     if (!user) {
-      // Don't reveal if email exists
       return res.json({
         message: "If that email exists, a reset link has been sent",
       });
@@ -263,7 +258,6 @@ exports.resetPassword = async (req, res, next) => {
     const { token } = req.params;
     const { password } = req.body;
 
-    // Validate password
     const passwordValidation = validatePassword(password);
     if (!passwordValidation.isValid) {
       return res
@@ -271,7 +265,12 @@ exports.resetPassword = async (req, res, next) => {
         .json({ error: passwordValidation.errors.join(", ") });
     }
 
-    const tokenDoc = await Token.verifyAndUseToken(token, "password_reset");
+    const tokenDoc = await Token.findOne({
+      token,
+      type: "password_reset",
+      isUsed: false,
+      expiresAt: { $gt: new Date() },
+    });
 
     if (!tokenDoc) {
       return res.status(400).json({ error: "Invalid or expired reset token" });
@@ -285,6 +284,11 @@ exports.resetPassword = async (req, res, next) => {
     // Set new password
     user.password = password;
     await user.save();
+
+    // Mark token as used
+    tokenDoc.isUsed = true;
+    tokenDoc.usedAt = new Date();
+    await tokenDoc.save();
 
     res.json({ message: "Password reset successful. You can now login." });
   } catch (error) {
@@ -329,7 +333,6 @@ exports.refreshToken = async (req, res, next) => {
       return res.status(401).json({ error: "Invalid token" });
     }
 
-    // Check if user is verified
     if (!user.isVerified) {
       return res.status(403).json({
         error: "Email not verified",

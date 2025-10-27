@@ -243,7 +243,7 @@ exports.assignEvaluators = async (req, res, next) => {
             status: "pending",
           });
           return {
-            id: evaluator._id.toString(),
+            id: evaluator._id,
             name: evaluator.fullName,
             workload: pendingCount,
           };
@@ -301,28 +301,50 @@ exports.assignEvaluators = async (req, res, next) => {
       });
 
       if (!existingEvaluation) {
-        await Evaluation.create({
+        // ✅ FIX: Create evaluation with proper schema
+        const newEvaluation = await Evaluation.create({
           ideaId: id,
           evaluatorId,
           status: "pending",
+          scores: {
+            innovation: 0,
+            feasibility: 0,
+            impact: 0,
+            presentation: 0,
+          },
+          comments: "",
         });
 
-        // ✅ FIX: Convert _id to string for email
+        console.log("✅ Created evaluation:", newEvaluation._id);
+
         const evaluator = evaluators.find(
-          (e) => e._id.toString() === evaluatorId
+          (e) => e._id.toString() === evaluatorId.toString()
         );
 
         if (evaluator) {
+          // Create notification
+          await Notification.create({
+            userId: evaluator._id,
+            type: "idea_assigned",
+            title: "New Idea Assigned",
+            message: `You have been assigned to evaluate: ${idea.title}`,
+            link: `/evaluate?id=${idea._id}`,
+            metadata: {
+              ideaId: idea._id,
+              ideaTitle: idea.title,
+            },
+          });
+
+          // Send email
           try {
             await emailService.sendIdeaAssignedEmail(
               evaluator.email,
               evaluator.fullName,
               idea.title,
-              idea._id.toString() // ✅ FIXED: Convert ObjectId to string
+              idea._id.toString()
             );
           } catch (emailError) {
             console.error("Failed to send assignment email:", emailError);
-            // Don't fail the whole operation if email fails
           }
         }
       }
@@ -332,16 +354,143 @@ exports.assignEvaluators = async (req, res, next) => {
       message: autoAssign
         ? `Idea automatically assigned to evaluator with least workload`
         : "Evaluators assigned successfully",
-      idea: await Idea.findById(id).populate(
-        "assignedEvaluators",
-        "fullName email"
-      ),
+      idea: await Idea.findById(id)
+        .populate("assignedEvaluators", "fullName email")
+        .populate("founderId", "fullName email"),
     });
+  } catch (error) {
+    console.error("Assignment error:", error);
+    next(error);
+  }
+};
+
+exports.getAllRoleRequests = async (req, res, next) => {
+  try {
+    const { status, role } = req.query;
+
+    const query = {};
+    if (status) {
+      query["roleRequests.status"] = status;
+    }
+    if (role) {
+      query["roleRequests.role"] = role;
+    }
+
+    const users = await User.find({
+      "roleRequests.0": { $exists: true },
+    }).select("fullName email roleRequests createdAt");
+
+    // Flatten role requests with user info
+    const roleRequests = [];
+    users.forEach((user) => {
+      user.roleRequests.forEach((request) => {
+        if (!status || request.status === status) {
+          if (!role || request.role === role) {
+            roleRequests.push({
+              _id: request._id,
+              user: {
+                id: user._id,
+                fullName: user.fullName,
+                email: user.email,
+              },
+              ...request.toObject(),
+            });
+          }
+        }
+      });
+    });
+
+    // Sort by requested date (newest first)
+    roleRequests.sort(
+      (a, b) => new Date(b.requestedAt) - new Date(a.requestedAt)
+    );
+
+    res.json({ roleRequests });
   } catch (error) {
     next(error);
   }
 };
 
+// Review role request
+exports.reviewRoleRequest = async (req, res, next) => {
+  try {
+    const { userId, requestId } = req.params;
+    const { action, reviewNotes } = req.body;
+
+    if (!["approve", "reject"].includes(action)) {
+      return res
+        .status(400)
+        .json({ error: "Action must be 'approve' or 'reject'" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const request = user.roleRequests.id(requestId);
+    if (!request) {
+      return res.status(404).json({ error: "Role request not found" });
+    }
+
+    if (request.status !== "pending") {
+      return res
+        .status(400)
+        .json({ error: "This request has already been reviewed" });
+    }
+
+    // Update request
+    request.status = action === "approve" ? "approved" : "rejected";
+    request.reviewedAt = new Date();
+    request.reviewedBy = req.user.id;
+    request.reviewNotes = reviewNotes || "";
+
+    // Add role if approved
+    if (action === "approve") {
+      user.addRole(request.role);
+    }
+
+    await user.save();
+
+    // Create notification for user
+    await Notification.create({
+      userId: user._id,
+      type: action === "approve" ? "role_approved" : "role_rejected",
+      title: `Role Request ${action === "approve" ? "Approved" : "Rejected"}`,
+      message:
+        action === "approve"
+          ? `Your ${request.role} role request has been approved!`
+          : `Your ${request.role} role request has been rejected. ${
+              reviewNotes || ""
+            }`,
+      metadata: {
+        role: request.role,
+        reviewedBy: req.user.id,
+      },
+    });
+
+    // Send email
+    await emailService.sendRoleRequestReviewEmail(
+      user.email,
+      user.fullName,
+      request.role,
+      action === "approve",
+      reviewNotes
+    );
+
+    res.json({
+      message: `Role request ${action}d successfully`,
+      user: {
+        id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        roles: user.roles,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 // Get evaluator workload
 exports.getEvaluatorWorkload = async (req, res, next) => {
   try {

@@ -22,10 +22,16 @@ exports.saveIdea = async (req, res, next) => {
       }
 
       // ✅ CHANGED: Allow editing in more states, but with notifications
-      const editableStatuses = ['draft', 'rejected', 'submitted', 'under_review'];
+      const editableStatuses = [
+        "draft",
+        "rejected",
+        "submitted",
+        "under_review",
+      ];
       if (!editableStatuses.includes(idea.status)) {
         return res.status(400).json({
-          error: "Cannot edit approved ideas. Please contact admin if changes are needed.",
+          error:
+            "Cannot edit approved ideas. Please contact admin if changes are needed.",
         });
       }
 
@@ -46,8 +52,8 @@ exports.saveIdea = async (req, res, next) => {
       idea.team = team || idea.team;
 
       // ✅ NEW: If idea was submitted/under_review and content changed, notify admin and evaluators
-      if (['submitted', 'under_review'].includes(idea.status)) {
-        const hasChanges = 
+      if (["submitted", "under_review"].includes(idea.status)) {
+        const hasChanges =
           oldValues.title !== idea.title ||
           oldValues.abstract !== idea.abstract ||
           oldValues.problem !== idea.problem ||
@@ -56,7 +62,7 @@ exports.saveIdea = async (req, res, next) => {
 
         if (hasChanges) {
           // Notify admin about changes
-          const admins = await User.find({ roles: 'admin' });
+          const admins = await User.find({ roles: "admin" });
           for (const admin of admins) {
             await emailService.sendIdeaUpdatedNotification(
               admin.email,
@@ -69,10 +75,10 @@ exports.saveIdea = async (req, res, next) => {
 
           // Notify assigned evaluators
           if (idea.assignedEvaluators && idea.assignedEvaluators.length > 0) {
-            const evaluators = await User.find({ 
-              _id: { $in: idea.assignedEvaluators } 
+            const evaluators = await User.find({
+              _id: { $in: idea.assignedEvaluators },
             });
-            
+
             for (const evaluator of evaluators) {
               await emailService.sendIdeaUpdatedToEvaluator(
                 evaluator.email,
@@ -108,8 +114,6 @@ exports.saveIdea = async (req, res, next) => {
   }
 };
 
-
-
 // Submit idea for review
 exports.submitIdea = async (req, res, next) => {
   try {
@@ -122,11 +126,9 @@ exports.submitIdea = async (req, res, next) => {
     }
 
     if (!["draft", "rejected"].includes(idea.status)) {
-      return res
-        .status(400)
-        .json({
-          error: "This idea has already been submitted or is under review",
-        });
+      return res.status(400).json({
+        error: "This idea has already been submitted or is under review",
+      });
     }
 
     // Validate all required fields
@@ -137,11 +139,9 @@ exports.submitIdea = async (req, res, next) => {
       !idea.solution ||
       !idea.team
     ) {
-      return res
-        .status(400)
-        .json({
-          error: "Please complete all required fields before submitting",
-        });
+      return res.status(400).json({
+        error: "Please complete all required fields before submitting",
+      });
     }
 
     idea.submit();
@@ -157,6 +157,21 @@ exports.submitIdea = async (req, res, next) => {
     // Notify admins about new submission
     const admins = await User.find({ roles: "admin" });
     for (const admin of admins) {
+      // Create notification
+      await Notification.create({
+        userId: admin._id,
+        type: "idea_submitted",
+        title: "New Idea Submitted",
+        message: `${req.user.fullName} submitted: ${idea.title}`,
+        link: `/admin?tab=ideas&id=${idea._id}`,
+        metadata: {
+          ideaId: idea._id,
+          founderId: req.user.id,
+          founderName: req.user.fullName,
+        },
+      });
+
+      // Send email
       await emailService.sendNewSubmissionNotification(
         admin.email,
         admin.fullName,

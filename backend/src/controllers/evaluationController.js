@@ -114,6 +114,20 @@ exports.submitEvaluation = async (req, res, next) => {
     // Update idea's average score
     await updateIdeaAverageScore(ideaId);
 
+    // Notify founder
+    await Notification.create({
+      userId: idea.founderId._id,
+      type: 'idea_evaluated',
+      title: 'Evaluation Completed',
+      message: `Your idea "${idea.title}" has been evaluated`,
+      link: `/dashboard`,
+      metadata: {
+        ideaId: idea._id,
+        evaluatorName: req.user.fullName,
+        score: evaluation.averageScore
+      }
+    });
+
     // Send notification to founder
     await emailService.sendEvaluationCompletedToFounder(
       idea.founderId.email,
@@ -126,6 +140,19 @@ exports.submitEvaluation = async (req, res, next) => {
     // Notify admin
     const admins = await User.find({ roles: "admin" });
     for (const admin of admins) {
+      await Notification.create({
+        userId: admin._id,
+        type: 'evaluation_completed',
+        title: 'Evaluation Completed',
+        message: `${req.user.fullName} evaluated: ${idea.title}`,
+        link: `/admin?tab=ideas&id=${idea._id}`,
+        metadata: {
+          ideaId: idea._id,
+          evaluatorId: req.user.id,
+          evaluatorName: req.user.fullName
+        }
+      });
+
       await emailService.sendEvaluationCompletedEmail(
         admin.email,
         req.user.fullName,

@@ -422,4 +422,140 @@ exports.sendRoleAssignedEmail = async (email, fullName, roles) => {
   return await sendEmail(email, subject, html);
 };
 
+exports.sendOTPEmail = async (email, fullName, otp) => {
+  const subject = "Verify Your Email - mAIple Conference";
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h1 style="color: #ff6b35;">Verify Your Email 📧</h1>
+      <p>Hi ${fullName},</p>
+      <p>Thank you for registering with mAIple Conference. Please use the following OTP to verify your email address:</p>
+      <div style="text-align: center; margin: 30px 0;">
+        <div style="background: linear-gradient(135deg, #ff6b35 0%, #e84118 100%); 
+                    color: white; 
+                    padding: 20px; 
+                    font-size: 32px;
+                    font-weight: bold;
+                    letter-spacing: 5px;
+                    border-radius: 10px;
+                    display: inline-block;">
+          ${otp}
+        </div>
+      </div>
+      <p><strong>This OTP expires in 10 minutes.</strong></p>
+      <p>If you didn't create an account, please ignore this email.</p>
+      <p>Best regards,<br>The mAIple Team</p>
+    </div>
+  `;
+  return await sendEmail(email, subject, html);
+};
+
+// Send role request notification to admin
+exports.sendRoleRequestNotification = async (
+  adminEmail,
+  adminName,
+  userName,
+  userEmail,
+  role,
+  reason
+) => {
+  const subject = `New ${role} Role Request - Action Required`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h1 style="color: #ff6b35;">New Role Request 📝</h1>
+      <p>Hi ${adminName},</p>
+      <p><strong>${userName}</strong> has requested the <strong>${role}</strong> role.</p>
+      
+      <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
+        <p><strong>User Details:</strong></p>
+        <ul>
+          <li>Name: ${userName}</li>
+          <li>Email: ${userEmail}</li>
+          <li>Requested Role: ${role}</li>
+        </ul>
+      </div>
+
+      <div style="background: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0;">
+        <p><strong>Reason:</strong></p>
+        <p>${reason}</p>
+      </div>
+
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="${emailConfig.frontendUrl}/admin?tab=role-requests" 
+           style="background: linear-gradient(135deg, #ff6b35 0%, #e84118 100%); 
+                  color: white; 
+                  padding: 12px 30px; 
+                  text-decoration: none; 
+                  border-radius: 5px;
+                  display: inline-block;">
+          Review Request
+        </a>
+      </div>
+
+      <p>Please review this request in the admin panel.</p>
+      <p>Best regards,<br>mAIple System</p>
+    </div>
+  `;
+  return await sendEmail(adminEmail, subject, html);
+};
+
+// Send role request review email
+exports.sendRoleRequestReviewEmail = async (
+  userEmail,
+  userName,
+  role,
+  approved,
+  reviewNotes
+) => {
+  const subject = `Role Request ${
+    approved ? "Approved" : "Rejected"
+  } - mAIple Conference`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h1 style="color: ${approved ? "#28a745" : "#dc3545"};">
+        Role Request ${approved ? "Approved ✅" : "Rejected ❌"}
+      </h1>
+      <p>Hi ${userName},</p>
+      
+      ${
+        approved
+          ? `
+        <p>Great news! Your request for the <strong>${role}</strong> role has been approved.</p>
+        <div style="background: #d4edda; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #28a745;">
+          <p style="margin: 0;">You can now access ${role} features in your dashboard!</p>
+        </div>
+      `
+          : `
+        <p>Thank you for your interest. Unfortunately, your request for the <strong>${role}</strong> role has not been approved at this time.</p>
+        ${
+          reviewNotes
+            ? `
+          <div style="background: #f8d7da; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #dc3545;">
+            <p><strong>Review Notes:</strong></p>
+            <p>${reviewNotes}</p>
+          </div>
+        `
+            : ""
+        }
+        <p>You can submit a new request in the future with more information about your experience and qualifications.</p>
+      `
+      }
+
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="${emailConfig.frontendUrl}/dashboard" 
+           style="background: linear-gradient(135deg, #ff6b35 0%, #e84118 100%); 
+                  color: white; 
+                  padding: 12px 30px; 
+                  text-decoration: none; 
+                  border-radius: 5px;
+                  display: inline-block;">
+          Go to Dashboard
+        </a>
+      </div>
+
+      <p>Best regards,<br>The mAIple Team</p>
+    </div>
+  `;
+  return await sendEmail(userEmail, subject, html);
+};
+
 module.exports = exports;

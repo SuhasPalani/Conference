@@ -54,6 +54,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/ideas', ideaRoutes);
 app.use('/api/evaluations', evaluationRoutes);
+app.use('/api/role-requests', require('./routes/roleRequests'));
+app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/admin', adminRoutes);
 
 // Health check endpoint

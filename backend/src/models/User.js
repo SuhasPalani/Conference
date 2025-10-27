@@ -1,3 +1,4 @@
+// FILE: backend/src/models/User.js
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
@@ -30,9 +31,37 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  verificationToken: String,
-  resetPasswordToken: String,
-  resetPasswordExpire: Date,
+  roleRequests: [{
+    role: {
+      type: String,
+      enum: ['founder', 'evaluator'],
+      required: true
+    },
+    reason: {
+      type: String,
+      required: true,
+      maxlength: 1000
+    },
+    previousWork: {
+      type: String,
+      maxlength: 1000
+    },
+    status: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected'],
+      default: 'pending'
+    },
+    requestedAt: {
+      type: Date,
+      default: Date.now
+    },
+    reviewedAt: Date,
+    reviewedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    reviewNotes: String
+  }],
   lastLogin: Date
 }, {
   timestamps: true
@@ -71,6 +100,11 @@ userSchema.methods.addRole = function(role) {
 // Method to remove role
 userSchema.methods.removeRole = function(role) {
   this.roles = this.roles.filter(r => r !== role);
+};
+
+// Method to get pending role requests
+userSchema.methods.getPendingRequests = function() {
+  return this.roleRequests.filter(req => req.status === 'pending');
 };
 
 module.exports = mongoose.model('User', userSchema);
