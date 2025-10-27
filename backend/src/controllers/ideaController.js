@@ -4,7 +4,7 @@ const Idea = require("../models/Idea");
 const Evaluation = require("../models/Evaluation");
 const User = require("../models/User");
 const emailService = require("../services/emailService");
-
+const Notification = require("../models/Notification");
 // Create/Update idea (save draft or update)
 exports.saveIdea = async (req, res, next) => {
   try {
@@ -145,6 +145,7 @@ exports.submitIdea = async (req, res, next) => {
     }
 
     idea.submit();
+    idea.status = "under_review"; // ✅ AUTO-SET TO UNDER_REVIEW
     await idea.save();
 
     // Send confirmation email to founder

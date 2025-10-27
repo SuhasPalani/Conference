@@ -103,19 +103,23 @@ export default function EvaluationForm({ idea }: EvaluationFormProps) {
 
         {/* ✅ FIXED: Show Pitch Deck if available */}
         {idea.pitchDeck && (
-          <div>
-            <h3 className="text-sm font-semibold text-gray-400 mb-2">PITCH DECK</h3>
-            <a
-              href={`http://localhost:5000/${idea.pitchDeck}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center px-4 py-2 bg-orange-900/30 text-orange-300 rounded-lg hover:bg-orange-900/50 transition-colors"
-            >
-              <span className="mr-2">📄</span>
-              View Pitch Deck
-            </a>
-          </div>
-        )}
+  <div>
+    <h3 className="text-sm font-semibold text-gray-400 mb-2">PITCH DECK</h3>
+    <a 
+      href={`${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}/${idea.pitchDeck}`} 
+      target="_blank" 
+      rel="noopener noreferrer" 
+      className="inline-flex items-center px-4 py-2 bg-orange-900/30 text-orange-300 rounded-lg hover:bg-orange-900/50 transition-colors"
+    >
+      <span className="mr-2">📄</span>
+      View Pitch Deck
+    </a>
+    <p className="text-xs text-gray-500 mt-2">
+      File: {idea.pitchDeck.split('/').pop()}
+    </p>
+  </div>
+)}
+
       </div>
 
       {/* Evaluation Form */}

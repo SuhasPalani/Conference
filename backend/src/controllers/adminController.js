@@ -3,7 +3,7 @@ const User = require("../models/User");
 const Idea = require("../models/Idea");
 const Evaluation = require("../models/Evaluation");
 const emailService = require("../services/emailService");
-
+const Notification = require("../models/Notification");
 // Get all users
 exports.getAllUsers = async (req, res, next) => {
   try {
@@ -301,18 +301,12 @@ exports.assignEvaluators = async (req, res, next) => {
       });
 
       if (!existingEvaluation) {
-        // ✅ FIX: Create evaluation with proper schema
+        // ✅ FIX: Don't set scores for pending evaluations
         const newEvaluation = await Evaluation.create({
           ideaId: id,
           evaluatorId,
           status: "pending",
-          scores: {
-            innovation: 0,
-            feasibility: 0,
-            impact: 0,
-            presentation: 0,
-          },
-          comments: "",
+          // Scores will be set when evaluator submits
         });
 
         console.log("✅ Created evaluation:", newEvaluation._id);

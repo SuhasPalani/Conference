@@ -3,7 +3,7 @@ const Evaluation = require("../models/Evaluation");
 const Idea = require("../models/Idea");
 const User = require("../models/User");
 const emailService = require("../services/emailService");
-
+const Notification = require("../models/Notification");
 // Get assigned ideas for evaluation
 exports.getAssignedIdeas = async (req, res, next) => {
   try {
@@ -13,7 +13,7 @@ exports.getAssignedIdeas = async (req, res, next) => {
     const ideas = await Idea.find({
       assignedEvaluators: req.user.id,
       status: { $in: ["submitted", "under_review"] },
-    }).populate("founderId", "fullName");
+    }).populate("founderId", "fullName"); // ✅ Don't include email for privacy
 
     // Get evaluation status for each idea
     const ideasWithEvalStatus = await Promise.all(
@@ -23,9 +23,11 @@ exports.getAssignedIdeas = async (req, res, next) => {
           evaluatorId: req.user.id,
         });
 
-        // Redact PII from idea
+        // Convert to object and remove founder email
         const ideaObj = idea.toObject();
-        delete ideaObj.founderId.email;
+        if (ideaObj.founderId) {
+          delete ideaObj.founderId.email;
+        }
 
         return {
           ...ideaObj,
@@ -111,30 +113,55 @@ exports.submitEvaluation = async (req, res, next) => {
 
     await evaluation.save();
 
-    // Update idea's average score
+    // ✅ UPDATE IDEA'S AVERAGE SCORE
     await updateIdeaAverageScore(ideaId);
 
-    // Notify founder
+    // ✅ GET UPDATED IDEA WITH NEW AVERAGE
+    const updatedIdea = await Idea.findById(ideaId);
+    const averageScore = updatedIdea.averageScore;
+
+    // ✅ AUTO-UPDATE IDEA STATUS BASED ON SCORE
+    let newStatus = updatedIdea.status;
+    if (averageScore >= 7.5) {
+      newStatus = "approved";
+      updatedIdea.status = "approved";
+    } else if (averageScore < 7.5) {
+      newStatus = "rejected";
+      updatedIdea.status = "rejected";
+    }
+    await updatedIdea.save();
+
+    // ✅ NOTIFY FOUNDER WITH COMMENTS
     await Notification.create({
       userId: idea.founderId._id,
-      type: 'idea_evaluated',
-      title: 'Evaluation Completed',
-      message: `Your idea "${idea.title}" has been evaluated`,
+      type: newStatus === "approved" ? "idea_approved" : "idea_rejected",
+      title:
+        newStatus === "approved"
+          ? "Idea Approved! 🎉"
+          : "Idea Needs Improvement",
+      message:
+        newStatus === "approved"
+          ? `Congratulations! Your idea "${idea.title}" has been approved with a score of ${averageScore}/10!`
+          : `Your idea "${idea.title}" received a score of ${averageScore}/10. Review the feedback to improve.`,
       link: `/dashboard`,
       metadata: {
         ideaId: idea._id,
         evaluatorName: req.user.fullName,
-        score: evaluation.averageScore
-      }
+        score: averageScore,
+        status: newStatus,
+        comments: comments,
+      },
     });
 
-    // Send notification to founder
+    // ✅ SEND EMAIL TO FOUNDER WITH COMMENTS
     await emailService.sendEvaluationCompletedToFounder(
       idea.founderId.email,
       idea.founderId.fullName,
       idea.title,
       req.user.fullName,
-      evaluation.averageScore
+      averageScore,
+      comments, // ✅ ADD COMMENTS
+      newStatus
     );
 
     // Notify admin
@@ -142,25 +169,34 @@ exports.submitEvaluation = async (req, res, next) => {
     for (const admin of admins) {
       await Notification.create({
         userId: admin._id,
-        type: 'evaluation_completed',
-        title: 'Evaluation Completed',
-        message: `${req.user.fullName} evaluated: ${idea.title}`,
+        type: "evaluation_completed",
+        title: "Evaluation Completed",
+        message: `${req.user.fullName} evaluated: ${idea.title} (Score: ${averageScore}/10, Status: ${newStatus})`,
         link: `/admin?tab=ideas&id=${idea._id}`,
         metadata: {
           ideaId: idea._id,
           evaluatorId: req.user.id,
-          evaluatorName: req.user.fullName
-        }
+          evaluatorName: req.user.fullName,
+          score: averageScore,
+          status: newStatus,
+        },
       });
 
       await emailService.sendEvaluationCompletedEmail(
         admin.email,
         req.user.fullName,
-        idea.title
+        idea.title,
+        averageScore,
+        newStatus
       );
     }
 
-    res.json({ message: "Evaluation submitted successfully", evaluation });
+    res.json({
+      message: "Evaluation submitted successfully",
+      evaluation,
+      ideaStatus: newStatus,
+      averageScore,
+    });
   } catch (error) {
     next(error);
   }

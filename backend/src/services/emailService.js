@@ -266,30 +266,101 @@ exports.sendEvaluationCompletedToFounder = async (
   founderName,
   ideaTitle,
   evaluatorName,
-  averageScore
+  averageScore,
+  comments,
+  status
 ) => {
-  const subject = "Evaluation Completed for Your Idea";
+  const statusEmoji = status === 'approved' ? '🎉' : '📝';
+  const statusColor = status === 'approved' ? 'green' : 'orange';
+  const statusText = status === 'approved' ? 'Approved' : 'Needs Improvement';
+  
+  const subject = `Evaluation ${statusText} - ${ideaTitle}`;
+  
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <h1 style="color: #ff6b35;">Evaluation Received! ⭐</h1>
+      <h1 style="color: #ff6b35;">Evaluation Received! ${statusEmoji}</h1>
       <p>Hi ${founderName},</p>
-      <p>Good news! <strong>${evaluatorName}</strong> has completed their evaluation for your idea:</p>
-      <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
-        <h3 style="margin: 0;">${ideaTitle}</h3>
-        <p style="margin: 10px 0 0 0; font-size: 24px; color: #ff6b35;"><strong>Score: ${averageScore}/10</strong></p>
+      
+      <p>${status === 'approved' 
+        ? 'Great news! Your idea has been approved!' 
+        : 'Thank you for your submission. Your idea needs some improvements.'
+      }</p>
+      
+      <p><strong>${evaluatorName}</strong> has completed the evaluation for:</p>
+      
+      <div style="background: #f5f5f5; padding: 20px; border-radius: 10px; margin: 20px 0;">
+        <h3 style="margin: 0 0 10px 0;">${ideaTitle}</h3>
+        <div style="font-size: 32px; color: ${status === 'approved' ? '#28a745' : '#ff6b35'}; font-weight: bold; margin: 10px 0;">
+          ${averageScore}/10
+        </div>
+        <div style="background: ${status === 'approved' ? '#d4edda' : '#fff3cd'}; 
+                    padding: 10px; 
+                    border-radius: 5px; 
+                    margin-top: 10px;
+                    border-left: 4px solid ${status === 'approved' ? '#28a745' : '#ffc107'};">
+          <strong>Status: ${statusText.toUpperCase()}</strong>
+        </div>
       </div>
-      <p>View detailed feedback in your dashboard: <a href="${emailConfig.frontendUrl}/dashboard">View Feedback</a></p>
-      <p>Best regards,<br>The mAIple Team</p>
+      
+      ${comments ? `
+      <div style="background: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #ffc107;">
+        <h4 style="margin: 0 0 10px 0; color: #333;">📝 Evaluator Feedback:</h4>
+        <p style="margin: 0; color: #666; font-style: italic; white-space: pre-wrap;">"${comments}"</p>
+      </div>
+      ` : ''}
+      
+      ${status === 'approved' ? `
+      <div style="background: #d4edda; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #28a745;">
+        <p style="margin: 0; color: #155724;">
+          <strong>🎉 Congratulations!</strong><br>
+          Your idea has been approved! You're one step closer to presenting at mAIple Conference.
+        </p>
+      </div>
+      ` : `
+      <div style="background: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #ffc107;">
+        <p style="margin: 0; color: #856404;">
+          <strong>Keep Going!</strong><br>
+          Review the feedback carefully and refine your idea. You can improve and resubmit!
+        </p>
+      </div>
+      `}
+      
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="${emailConfig.frontendUrl}/dashboard" 
+           style="background: linear-gradient(135deg, #ff6b35 0%, #e84118 100%); 
+                  color: white; 
+                  padding: 12px 30px; 
+                  text-decoration: none; 
+                  border-radius: 5px;
+                  display: inline-block;
+                  font-weight: bold;">
+          View in Dashboard
+        </a>
+      </div>
+      
+      <p style="color: #666; font-size: 14px; margin-top: 30px;">
+        Best regards,<br>
+        <strong>The mAIple Team</strong>
+      </p>
     </div>
   `;
-  return await sendEmail(founderEmail, subject, html);
+  
+  try {
+    await sendEmail(founderEmail, subject, html);
+    console.log(`✅ Evaluation email sent to ${founderEmail} (Status: ${status})`);
+  } catch (error) {
+    console.error(`❌ Failed to send evaluation email to ${founderEmail}:`, error);
+    throw error;
+  }
 };
 
 // Evaluation completed notification to admin
 exports.sendEvaluationCompletedEmail = async (
   adminEmail,
   evaluatorName,
-  ideaTitle
+  ideaTitle,
+  averageScore,
+  status
 ) => {
   const subject = "Evaluation Completed - Admin Notification";
   const html = `
@@ -299,6 +370,8 @@ exports.sendEvaluationCompletedEmail = async (
       <p><strong>${evaluatorName}</strong> has completed their evaluation for:</p>
       <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
         <h3 style="margin: 0;">${ideaTitle}</h3>
+        <p style="margin: 10px 0 0 0;"><strong>Score:</strong> ${averageScore}/10</p>
+        <p style="margin: 5px 0 0 0;"><strong>Status:</strong> ${status.toUpperCase()}</p>
       </div>
       <p>View details in the admin dashboard: <a href="${emailConfig.frontendUrl}/admin">Admin Dashboard</a></p>
       <p>Best regards,<br>mAIple System</p>
