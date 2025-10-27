@@ -23,10 +23,18 @@ export default function Login() {
       addToast('Welcome back!', 'success');
       navigate('/dashboard');
     } catch (error: any) {
-      addToast(
-        error.response?.data?.error || 'Login failed. Please try again.',
-        'error'
-      );
+      const errorData = error.response?.data;
+      
+      // Check if email needs verification
+      if (errorData?.needsVerification) {
+        addToast('Please verify your email first. Check your inbox for OTP.', 'warning');
+        navigate('/verify-otp', { state: { email } });
+      } else {
+        addToast(
+          errorData?.error || 'Login failed. Please try again.',
+          'error'
+        );
+      }
     } finally {
       setIsLoading(false);
     }

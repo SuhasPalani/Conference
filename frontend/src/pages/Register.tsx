@@ -29,12 +29,21 @@ export default function Register() {
       return;
     }
 
+    if (formData.password.length < 6) {
+      addToast('Password must be at least 6 characters', 'error');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
       await register(formData.email, formData.password, formData.fullName);
-      addToast('Registration successful! Please check your email to verify your account.', 'success');
-      navigate('/login');
+      addToast('Registration successful! Check your email for OTP.', 'success');
+      
+      // Redirect to OTP verification page
+      navigate('/verify-otp', { 
+        state: { email: formData.email } 
+      });
     } catch (error: any) {
       addToast(
         error.response?.data?.error || 'Registration failed. Please try again.',
@@ -72,6 +81,7 @@ export default function Register() {
                 className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 transition-colors"
                 placeholder="John Doe"
                 required
+                minLength={2}
               />
             </div>
 

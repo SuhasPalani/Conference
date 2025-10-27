@@ -2,14 +2,18 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import NotificationBell from '@/components/Notifications/NotificationBell';
 import AdminDashboard from '@/components/Admin/Dashboard';
 import UserManagement from '@/components/Admin/UserManagement';
 import IdeaManagement from '@/components/Admin/IdeaManagement';
 import RoleAssignment from '@/components/Admin/RoleAssignment';
+import RoleRequestManagement from '@/components/Admin/RoleRequestManagement';
+
+type TabType = 'dashboard' | 'users' | 'ideas' | 'assign' | 'role-requests';
 
 export default function Admin() {
   const { user, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'ideas' | 'assign'>('dashboard');
+  const [activeTab, setActiveTab] = useState<TabType>('dashboard');
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
@@ -23,6 +27,7 @@ export default function Admin() {
             </Link>
 
             <div className="flex items-center space-x-6">
+              <NotificationBell />
               <span className="text-gray-400">Hi, {user?.fullName}</span>
               <Link to="/dashboard" className="text-gray-400 hover:text-white transition-colors">
                 Dashboard
@@ -47,14 +52,15 @@ export default function Admin() {
         {/* Tabs */}
         <div className="flex gap-2 mb-8 overflow-x-auto">
           {[
-            { id: 'dashboard', label: '📊 Dashboard', icon: '📊' },
-            { id: 'users', label: '👥 Users', icon: '👥' },
-            { id: 'ideas', label: '💡 Ideas', icon: '💡' },
-            { id: 'assign', label: '🎯 Assign Evaluators', icon: '🎯' },
+            { id: 'dashboard', label: '📊 Dashboard' },
+            { id: 'role-requests', label: '📝 Role Requests' },
+            { id: 'users', label: '👥 Users' },
+            { id: 'ideas', label: '💡 Ideas' },
+            { id: 'assign', label: '🎯 Assign Evaluators' },
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => setActiveTab(tab.id as TabType)}
               className={`
                 px-6 py-3 rounded-lg font-semibold transition-all whitespace-nowrap
                 ${activeTab === tab.id
@@ -70,6 +76,7 @@ export default function Admin() {
 
         {/* Tab Content */}
         {activeTab === 'dashboard' && <AdminDashboard />}
+        {activeTab === 'role-requests' && <RoleRequestManagement />}
         {activeTab === 'users' && <UserManagement />}
         {activeTab === 'ideas' && <IdeaManagement />}
         {activeTab === 'assign' && <RoleAssignment />}

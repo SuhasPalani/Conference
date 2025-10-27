@@ -10,13 +10,21 @@ const api = axios.create({
   },
 });
 
-// Request interceptor
+// Add auth token to requests
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Response interceptor for token refresh
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
-    // If token expired and we haven't retried yet
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
@@ -25,12 +33,10 @@ api.interceptors.response.use(
         if (token) {
           const { data } = await api.post('/auth/refresh-token', { token });
           localStorage.setItem('token', data.token);
-          api.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
           originalRequest.headers['Authorization'] = `Bearer ${data.token}`;
           return api(originalRequest);
         }
       } catch (refreshError) {
-        // Token refresh failed, logout user
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         window.location.href = '/login';
@@ -42,41 +48,48 @@ api.interceptors.response.use(
   }
 );
 
-// Response interceptor
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
-  }
-);
-
-// Auth APIs
+// ============ Auth APIs ============
 export const authAPI = {
   register: (data: any) => api.post('/auth/register', data),
+  verifyOTP: (email: string, otp: string) => 
+    api.post('/auth/verify-otp', { email, otp }),
+  resendOTP: (email: string) => 
+    api.post('/auth/resend-otp', { email }),
   login: (data: any) => api.post('/auth/login', data),
   logout: () => api.post('/auth/logout'),
   getMe: () => api.get('/auth/me'),
-  forgotPassword: (email: string) => api.post('/auth/forgot-password', { email }),
+  forgotPassword: (email: string) => 
+    api.post('/auth/forgot-password', { email }),
   resetPassword: (token: string, password: string) => 
     api.post(`/auth/reset-password/${token}`, { password }),
-  verifyEmail: (token: string) => 
-    api.get(`/auth/verify-email/${token}`),
-  resendVerification: (email: string) => 
-    api.post('/auth/resend-verification', { email }),
+  refreshToken: (token: string) => 
+    api.post('/auth/refresh-token', { token }),
 };
 
-// User APIs
+// ============ User APIs ============
 export const userAPI = {
   getProfile: () => api.get('/users/me'),
   updateProfile: (data: any) => api.put('/users/me', data),
 };
 
-// Idea APIs
+// ============ Role Request APIs ============
+export const roleRequestAPI = {
+  submit: (data: { role: string; reason: string; previousWork?: string }) => 
+    api.post('/role-requests', data),
+  getMy: () => api.get('/role-requests/my'),
+};
+
+// ============ Notification APIs ============
+export const notificationAPI = {
+  getAll: (params?: { page?: number; limit?: number; unreadOnly?: boolean }) => 
+    api.get('/notifications', { params }),
+  getUnreadCount: () => api.get('/notifications/unread-count'),
+  markAsRead: (id: string) => api.put(`/notifications/${id}/read`),
+  markAllAsRead: () => api.put('/notifications/mark-all-read'),
+  delete: (id: string) => api.delete(`/notifications/${id}`),
+};
+
+// ============ Idea APIs ============
 export const ideaAPI = {
   create: (data: any) => api.post('/ideas', data),
   update: (id: string, data: any) => api.put(`/ideas/${id}`, data),
@@ -93,7 +106,7 @@ export const ideaAPI = {
   },
 };
 
-// Evaluation APIs
+// ============ Evaluation APIs ============
 export const evaluationAPI = {
   getAssigned: (status?: string) => 
     api.get('/evaluations/assigned', { params: { status } }),
@@ -103,7 +116,7 @@ export const evaluationAPI = {
   getForIdea: (ideaId: string) => api.get(`/evaluations/idea/${ideaId}`),
 };
 
-// Admin APIs
+// ============ Admin APIs ============
 export const adminAPI = {
   getDashboard: () => api.get('/admin/dashboard'),
   getUsers: (params?: any) => api.get('/admin/users', { params }),
@@ -119,6 +132,11 @@ export const adminAPI = {
   getEvaluatorWorkload: () => api.get('/admin/evaluators/workload'),
   exportIdeas: () => api.get('/admin/export/ideas'),
   exportEvaluations: () => api.get('/admin/export/evaluations'),
+  // Role Request Management
+  getRoleRequests: (params?: { status?: string; role?: string }) => 
+    api.get('/admin/role-requests', { params }),
+  reviewRoleRequest: (userId: string, requestId: string, data: { action: string; reviewNotes?: string }) => 
+    api.put(`/admin/role-requests/${userId}/${requestId}`, data),
 };
 
 export default api;

@@ -2,7 +2,8 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
-import { ideaAPI, evaluationAPI } from '@/services/api';
+import { ideaAPI, evaluationAPI, roleRequestAPI } from '@/services/api';
+import NotificationBell from '@/components/Notifications/NotificationBell';
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
@@ -19,8 +20,20 @@ export default function Dashboard() {
     enabled: user?.roles.includes('evaluator'),
   });
 
+  const { data: roleRequestsData } = useQuery({
+    queryKey: ['myRoleRequests'],
+    queryFn: () => roleRequestAPI.getMy(),
+  });
+
   const ideas = ideasData?.data?.ideas || [];
   const assignedIdeas = evaluationsData?.data?.ideas || [];
+  const roleRequests = roleRequestsData?.data?.roleRequests || [];
+  const pendingRequests = roleRequests.filter((r: any) => r.status === 'pending');
+
+  const hasFounderRole = user?.roles.includes('founder');
+  const hasEvaluatorRole = user?.roles.includes('evaluator');
+  const hasAdminRole = user?.roles.includes('admin');
+  const canRequestRoles = !hasFounderRole || !hasEvaluatorRole;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
@@ -34,6 +47,7 @@ export default function Dashboard() {
             </Link>
 
             <div className="flex items-center space-x-6">
+              <NotificationBell />
               <span className="text-gray-400">Hi, {user?.fullName}</span>
               <button
                 onClick={logout}
@@ -56,9 +70,57 @@ export default function Dashboard() {
           <p className="text-gray-400">Here's what's happening with your account</p>
         </div>
 
+        {/* Role Request CTA */}
+        {canRequestRoles && pendingRequests.length === 0 && (
+          <div className="mb-8 glass-morphism rounded-xl p-6 border-2 border-orange-500/50">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <h3 className="text-xl font-bold text-white mb-2">
+                  🚀 Unlock More Features
+                </h3>
+                <p className="text-gray-400 mb-4">
+                  Request founder or evaluator roles to access idea submission and evaluation features!
+                </p>
+                <Link
+                  to="/role-request"
+                  className="inline-block px-6 py-3 gradient-primary text-white rounded-lg font-semibold hover:opacity-90 transition-all"
+                >
+                  Request Role Access
+                </Link>
+              </div>
+              <div className="text-6xl ml-4">🔓</div>
+            </div>
+          </div>
+        )}
+
+        {/* Pending Role Requests Alert */}
+        {pendingRequests.length > 0 && (
+          <div className="mb-8 glass-morphism rounded-xl p-6 border-2 border-yellow-500/50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="text-4xl">⏳</div>
+                <div>
+                  <h3 className="text-lg font-bold text-white mb-1">
+                    Role Request Pending
+                  </h3>
+                  <p className="text-sm text-gray-400">
+                    Your {pendingRequests.map((r: any) => r.role).join(', ')} request(s) are being reviewed by admins
+                  </p>
+                </div>
+              </div>
+              <Link
+                to="/role-request"
+                className="px-4 py-2 bg-yellow-900/30 text-yellow-300 rounded-lg text-sm font-semibold hover:bg-yellow-900/50 transition-all"
+              >
+                View Status
+              </Link>
+            </div>
+          </div>
+        )}
+
         {/* Role Cards */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-          {user?.roles.includes('founder') && (
+          {hasFounderRole && (
             <Link
               to="/submit-idea"
               className="p-6 glass-morphism rounded-xl card-glow hover:scale-105 transition-transform"
@@ -73,7 +135,7 @@ export default function Dashboard() {
             </Link>
           )}
 
-          {user?.roles.includes('evaluator') && (
+          {hasEvaluatorRole && (
             <Link
               to="/evaluate"
               className="p-6 glass-morphism rounded-xl card-glow hover:scale-105 transition-transform"
@@ -90,7 +152,7 @@ export default function Dashboard() {
             </Link>
           )}
 
-          {user?.roles.includes('admin') && (
+          {hasAdminRole && (
             <Link
               to="/admin"
               className="p-6 glass-morphism rounded-xl card-glow hover:scale-105 transition-transform"
@@ -107,8 +169,8 @@ export default function Dashboard() {
         </div>
 
         {/* Recent Ideas (Founder) */}
-        {user?.roles.includes('founder') && ideas.length > 0 && (
-          <div className="glass-morphism rounded-xl p-6">
+        {hasFounderRole && ideas.length > 0 && (
+          <div className="glass-morphism rounded-xl p-6 mb-8">
             <h2 className="text-2xl font-bold text-white mb-6">Your Recent Ideas</h2>
             <div className="space-y-4">
               {ideas.slice(0, 3).map((idea: any) => (
@@ -127,7 +189,7 @@ export default function Dashboard() {
                     </div>
                     <span
                       className={`
-                        px-3 py-1 rounded-full text-xs font-semibold
+                        px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ml-4
                         ${idea.status === 'draft' ? 'bg-gray-700 text-gray-300' : ''}
                         ${idea.status === 'submitted' ? 'bg-blue-900 text-blue-300' : ''}
                         ${idea.status === 'under_review' ? 'bg-yellow-900 text-yellow-300' : ''}
@@ -145,8 +207,8 @@ export default function Dashboard() {
         )}
 
         {/* Assigned Ideas (Evaluator) */}
-        {user?.roles.includes('evaluator') && assignedIdeas.length > 0 && (
-          <div className="glass-morphism rounded-xl p-6 mt-6">
+        {hasEvaluatorRole && assignedIdeas.length > 0 && (
+          <div className="glass-morphism rounded-xl p-6">
             <h2 className="text-2xl font-bold text-white mb-6">Ideas to Evaluate</h2>
             <div className="space-y-4">
               {assignedIdeas.slice(0, 3).map((idea: any) => (
@@ -160,7 +222,7 @@ export default function Dashboard() {
                         {idea.title}
                       </h3>
                       <p className="text-sm text-gray-400">
-                        Status: {idea.evaluationStatus}
+                        Status: {idea.evaluationStatus?.replace('_', ' ')}
                       </p>
                     </div>
                     <Link
