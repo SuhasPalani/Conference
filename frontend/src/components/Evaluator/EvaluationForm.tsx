@@ -74,6 +74,10 @@ export default function EvaluationForm({ idea }: EvaluationFormProps) {
     { key: 'presentation', label: 'Presentation', description: 'Clarity and quality of the proposal' },
   ];
 
+  // ✅ FIX: Properly construct pitch deck URL
+  const apiUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
+  const pitchDeckUrl = idea.pitchDeck ? `${apiUrl}/${idea.pitchDeck}` : null;
+
   return (
     <div className="glass-morphism rounded-xl p-8">
       <h2 className="text-2xl font-bold text-white mb-2">{idea.title}</h2>
@@ -85,12 +89,12 @@ export default function EvaluationForm({ idea }: EvaluationFormProps) {
           <h3 className="text-sm font-semibold text-gray-400 mb-2">ABSTRACT</h3>
           <p className="text-white">{idea.abstract}</p>
         </div>
-
+        
         <div>
           <h3 className="text-sm font-semibold text-gray-400 mb-2">PROBLEM</h3>
           <p className="text-white">{idea.problem}</p>
         </div>
-
+        
         <div>
           <h3 className="text-sm font-semibold text-gray-400 mb-2">SOLUTION</h3>
           <p className="text-white">{idea.solution}</p>
@@ -101,25 +105,45 @@ export default function EvaluationForm({ idea }: EvaluationFormProps) {
           <p className="text-white">{idea.team}</p>
         </div>
 
-        {/* ✅ FIXED: Show Pitch Deck if available */}
-        {idea.pitchDeck && (
-  <div>
-    <h3 className="text-sm font-semibold text-gray-400 mb-2">PITCH DECK</h3>
-    <a 
-      href={`${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}/${idea.pitchDeck}`} 
-      target="_blank" 
-      rel="noopener noreferrer" 
-      className="inline-flex items-center px-4 py-2 bg-orange-900/30 text-orange-300 rounded-lg hover:bg-orange-900/50 transition-colors"
-    >
-      <span className="mr-2">📄</span>
-      View Pitch Deck
-    </a>
-    <p className="text-xs text-gray-500 mt-2">
-      File: {idea.pitchDeck.split('/').pop()}
-    </p>
-  </div>
-)}
+        {/* ✅ FIXED: Pitch Deck Viewer for Evaluators */}
+        {pitchDeckUrl && (
+          <div>
+            <h3 className="text-sm font-semibold text-gray-400 mb-2">PITCH DECK</h3>
+            
+            <div className="mb-3 flex gap-3">
+              <a 
+                href={pitchDeckUrl} 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="inline-flex items-center px-4 py-2 bg-orange-900/30 text-orange-300 rounded-lg hover:bg-orange-900/50 transition-colors text-sm font-semibold"
+              >
+                <span className="mr-2">📄</span>
+                Open in New Tab
+              </a>
+              <a 
+                href={pitchDeckUrl} 
+                download
+                className="inline-flex items-center px-4 py-2 bg-blue-900/30 text-blue-300 rounded-lg hover:bg-blue-900/50 transition-colors text-sm font-semibold"
+              >
+                <span className="mr-2">⬇️</span>
+                Download
+              </a>
+            </div>
 
+            {/* Embedded PDF/PPT Viewer */}
+            <div className="w-full h-[600px] bg-gray-900 rounded-lg overflow-hidden border border-gray-700">
+              <iframe
+                src={pitchDeckUrl}
+                className="w-full h-full"
+                title="Pitch Deck"
+              />
+            </div>
+
+            <p className="text-xs text-gray-500 mt-2">
+              File: {idea.pitchDeck.split('/').pop()}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Evaluation Form */}
