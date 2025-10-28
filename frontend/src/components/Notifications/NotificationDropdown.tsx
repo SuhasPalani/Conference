@@ -17,17 +17,19 @@ export default function NotificationDropdown({ onClose }: NotificationDropdownPr
   const unreadNotifications = notifications.filter(n => !n.isRead);
 
   return (
-    <div className="absolute right-0 mt-2 w-96 glass-morphism rounded-xl shadow-2xl border border-gray-700 z-50 max-h-[600px] flex flex-col">
+    <div className="fixed top-16 right-4 w-96 bg-gray-900/95 backdrop-blur-xl rounded-xl shadow-2xl border border-gray-700 z-[100] max-h-[calc(100vh-5rem)] flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="p-4 border-b border-gray-700">
+      <div className="p-4 border-b border-gray-700 flex-shrink-0">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-lg font-bold text-white">Notifications</h3>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-white transition-colors"
+            className="text-gray-400 hover:text-white transition-colors p-1 hover:bg-gray-800 rounded"
             aria-label="Close notifications"
           >
-            ✕
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
 

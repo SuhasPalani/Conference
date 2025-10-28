@@ -71,10 +71,10 @@ export default function Dashboard() {
           <p className="text-gray-400">Here's what's happening with your account</p>
         </div>
 
-        {/* Role Request CTA */}
+        {/* Role Request CTA - REDUCED WIDTH */}
         {canRequestRoles && pendingRequests.length === 0 && (
-          <div className="mb-8 glass-morphism rounded-xl p-6 border-2 border-orange-500/50">
-            <div className="flex items-start justify-between">
+          <div className="mb-8 max-w-2xl glass-morphism rounded-xl p-6 border-2 border-orange-500/50">
+            <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
                 <h3 className="text-xl font-bold text-white mb-2">
                   🚀 Unlock More Features
@@ -89,18 +89,18 @@ export default function Dashboard() {
                   Request Role Access
                 </Link>
               </div>
-              <div className="text-6xl ml-4">🔓</div>
+              <div className="text-5xl flex-shrink-0">🔓</div>
             </div>
           </div>
         )}
 
-        {/* Pending Role Requests Alert */}
+        {/* Pending Role Requests Alert - REDUCED WIDTH */}
         {pendingRequests.length > 0 && (
-          <div className="mb-8 glass-morphism rounded-xl p-6 border-2 border-yellow-500/50">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="text-4xl">⏳</div>
-                <div>
+          <div className="mb-8 max-w-4xl glass-morphism rounded-xl p-6 border-2 border-yellow-500/50">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-4 flex-1">
+                <div className="text-4xl flex-shrink-0">⏳</div>
+                <div className="flex-1">
                   <h3 className="text-lg font-bold text-white mb-1">
                     Role Request Pending
                   </h3>
@@ -111,7 +111,7 @@ export default function Dashboard() {
               </div>
               <Link
                 to="/role-request"
-                className="px-4 py-2 bg-yellow-900/30 text-yellow-300 rounded-lg text-sm font-semibold hover:bg-yellow-900/50 transition-all"
+                className="px-4 py-2 bg-yellow-900/30 text-yellow-300 rounded-lg text-sm font-semibold hover:bg-yellow-900/50 transition-all flex-shrink-0"
               >
                 View Status
               </Link>
@@ -171,87 +171,77 @@ export default function Dashboard() {
 
         {/* Recent Ideas (Founder) */}
         {hasFounderRole && ideas.length > 0 && (
-  <div className="glass-morphism rounded-xl p-6 mb-8">
-    <h2 className="text-2xl font-bold text-white mb-6">Your Recent Ideas</h2>
-    <div className="space-y-4">
-      {ideas.slice(0, 3).map((idea: any) => (
-        <div
-          key={idea._id}
-          className="p-4 bg-gray-800/50 rounded-lg border border-gray-700 hover:border-orange-500 transition-colors"
-        >
-          <div className="flex items-start justify-between mb-3">
-            <div className="flex-1">
-              <h3 className="text-lg font-semibold text-white mb-1">
-                {idea.title}
-              </h3>
-              <p className="text-sm text-gray-400 line-clamp-1">
-                {idea.abstract}
-              </p>
-            </div>
-            <span
-              className={`
-                px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ml-4
-                ${idea.status === 'draft' ? 'bg-gray-700 text-gray-300' : ''}
-                ${idea.status === 'submitted' ? 'bg-blue-900 text-blue-300' : ''}
-                ${idea.status === 'under_review' ? 'bg-yellow-900 text-yellow-300' : ''}
-                ${idea.status === 'approved' ? 'bg-green-900 text-green-300' : ''}
-                ${idea.status === 'rejected' ? 'bg-red-900 text-red-300' : ''}
-              `}
-            >
-              {idea.status.replace('_', ' ').toUpperCase()}
-            </span>
-          </div>
+          <div className="glass-morphism rounded-xl p-6 mb-8">
+            <h2 className="text-2xl font-bold text-white mb-6">Your Recent Ideas</h2>
+            <div className="space-y-4">
+              {ideas.slice(0, 3).map((idea: any) => (
+                <div
+                  key={idea._id}
+                  className="p-4 bg-gray-800/50 rounded-lg border border-gray-700 hover:border-orange-500 transition-colors"
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-white mb-1">
+                        {idea.title}
+                      </h3>
+                      <p className="text-sm text-gray-400 line-clamp-1">
+                        {idea.abstract}
+                      </p>
+                    </div>
+                    <span
+                      className={`
+                        px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ml-4
+                        ${idea.status === 'draft' ? 'bg-gray-700 text-gray-300' : ''}
+                        ${idea.status === 'submitted' ? 'bg-blue-900 text-blue-300' : ''}
+                        ${idea.status === 'under_review' ? 'bg-yellow-900 text-yellow-300' : ''}
+                        ${idea.status === 'approved' ? 'bg-green-900 text-green-300' : ''}
+                        ${idea.status === 'rejected' ? 'bg-red-900 text-red-300' : ''}
+                      `}
+                    >
+                      {idea.status.replace('_', ' ').toUpperCase()}
+                    </span>
+                  </div>
 
-          {/* ✅ ADD: Show Score and Comments */}
-          {/* ✅ ADD: Show Score and Comments */}
-          {idea.averageScore && (
-            <div className="mb-3">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-2xl font-bold text-orange-500">
-                  ⭐ {idea.averageScore}/10
-                </span>
-                {idea.status === 'approved' && (
-                  <span className="text-xs text-green-400">✅ Approved!</span>
-                )}
-                {idea.status === 'rejected' && (
-                  <span className="text-xs text-red-400">📝 Needs Improvement</span>
-                )}
-              </div>
-              
-              {/* Show latest evaluation comment */}
-              {idea.evaluations && idea.evaluations.length > 0 && idea.evaluations[0].comments && (
-                <div className="p-3 bg-gray-900/50 rounded-lg border border-gray-700">
-                  <p className="text-xs font-semibold text-gray-400 mb-1">
-                    Latest Feedback from {idea.evaluations[0].evaluatorName}:
-                  </p>
-                  <p className="text-sm text-gray-300 italic line-clamp-2">
-                    "{idea.evaluations[0].comments}"
-                  </p>
+                  {idea.averageScore && (
+                    <div className="mb-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-2xl font-bold text-orange-500">
+                          ⭐ {idea.averageScore}/10
+                        </span>
+                        {idea.status === 'approved' && (
+                          <span className="text-xs text-green-400">✅ Approved!</span>
+                        )}
+                        {idea.status === 'rejected' && (
+                          <span className="text-xs text-red-400">📝 Needs Improvement</span>
+                        )}
+                      </div>
+                      
+                      {idea.evaluations && idea.evaluations.length > 0 && idea.evaluations[0].comments && (
+                        <div className="p-3 bg-gray-900/50 rounded-lg border border-gray-700">
+                          <p className="text-xs font-semibold text-gray-400 mb-1">
+                            Latest Feedback from {idea.evaluations[0].evaluatorName}:
+                          </p>
+                          <p className="text-sm text-gray-300 italic line-clamp-2">
+                            "{idea.evaluations[0].comments}"
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigate(`/idea/${idea._id}`);
+                    }}
+                    className="text-sm text-orange-500 hover:text-orange-400 font-semibold"
+                  >
+                    View Full Details →
+                  </button>
                 </div>
-              )}
+              ))}
             </div>
-          )}
-          <button
-            type="button"
-            onClick={() => {
-              navigate(`/idea/${idea._id}`); // Navigate to dedicated idea view page
-            }}
-            className="text-sm text-orange-500 hover:text-orange-400 font-semibold"
-          >
-            View Full Details →
-          </button>
-
-          {/* <Link
-            to="/submit-idea"
-            className="text-sm text-orange-500 hover:text-orange-400 font-semibold"
-          >
-            View Details →
-          </Link> */}
-        </div>
-      ))}
-    </div>
-  </div>
-)}
+          </div>
+        )}
 
         {/* Assigned Ideas (Evaluator) */}
         {hasEvaluatorRole && assignedIdeas.length > 0 && (
