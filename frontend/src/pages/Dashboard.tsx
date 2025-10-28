@@ -1,11 +1,12 @@
 // FILE: frontend/src/pages/Dashboard.tsx
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import { ideaAPI, evaluationAPI, roleRequestAPI } from '@/services/api';
 import NotificationBell from '@/components/Notifications/NotificationBell';
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const { user, logout } = useAuth();
 
   const { data: ideasData } = useQuery({
@@ -38,7 +39,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
       {/* Navigation */}
-      <nav className="glass-morphism border-b border-gray-800">
+      <nav className="backdrop-blur border-b border-gray-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <Link to="/" className="flex items-center space-x-2">
@@ -48,8 +49,8 @@ export default function Dashboard() {
 
             <div className="flex items-center space-x-6">
               <NotificationBell />
-              <span className="text-gray-400">Hi, {user?.fullName}</span>
               <button
+                type="button"
                 onClick={logout}
                 className="text-gray-400 hover:text-white transition-colors"
               >
@@ -202,6 +203,7 @@ export default function Dashboard() {
           </div>
 
           {/* ✅ ADD: Show Score and Comments */}
+          {/* ✅ ADD: Show Score and Comments */}
           {idea.averageScore && (
             <div className="mb-3">
               <div className="flex items-center gap-2 mb-2">
@@ -229,13 +231,22 @@ export default function Dashboard() {
               )}
             </div>
           )}
+          <button
+            type="button"
+            onClick={() => {
+              navigate(`/idea/${idea._id}`); // Navigate to dedicated idea view page
+            }}
+            className="text-sm text-orange-500 hover:text-orange-400 font-semibold"
+          >
+            View Full Details →
+          </button>
 
-          <Link
+          {/* <Link
             to="/submit-idea"
             className="text-sm text-orange-500 hover:text-orange-400 font-semibold"
           >
             View Details →
-          </Link>
+          </Link> */}
         </div>
       ))}
     </div>

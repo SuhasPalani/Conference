@@ -292,30 +292,26 @@ exports.deleteIdea = async (req, res, next) => {
 };
 
 // Upload pitch deck
+// Upload pitch deck
 exports.uploadPitchDeck = async (req, res, next) => {
   try {
     const { id } = req.params;
-
     if (!req.file) {
       return res.status(400).json({ error: "No file uploaded" });
     }
-
     const idea = await Idea.findOne({ _id: id, founderId: req.user.id });
-
     if (!idea) {
       return res.status(404).json({ error: "Idea not found" });
     }
-
     if (!["draft", "rejected"].includes(idea.status)) {
       return res.status(400).json({ error: "Cannot update submitted ideas" });
     }
-
-    idea.pitchDeck = req.file.path;
+    // ✅ Store path with forward slashes
+    idea.pitchDeck = `uploads/${req.file.filename}`;
     await idea.save();
-
     res.json({
       message: "Pitch deck uploaded successfully",
-      filePath: req.file.path,
+      filePath: idea.pitchDeck,
     });
   } catch (error) {
     next(error);

@@ -16,6 +16,8 @@ import EvaluateIdeas from './pages/EvaluateIdeas';
 import RoleRequest from './pages/RoleRequest';
 import Admin from './pages/Admin';
 import NotFound from './pages/NotFound';
+import IdeaView from './pages/IdeaView';
+
 
 function ProtectedRoute({ 
   children, 
@@ -124,6 +126,14 @@ function App() {
           element={
             <ProtectedRoute roles={['admin']}>
               <Admin />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/idea/:id"
+          element={
+            <ProtectedRoute>
+              <IdeaView />
             </ProtectedRoute>
           }
         />
