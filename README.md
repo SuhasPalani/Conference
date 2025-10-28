@@ -346,7 +346,6 @@ npm run preview
 ```
 
 ---
-
 ## 📚 API Documentation
 
 API documentation is available in `postman.json`. Import it into Postman for full API testing.
