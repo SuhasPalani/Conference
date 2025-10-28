@@ -1,10 +1,15 @@
 // FILE: frontend/src/pages/EvaluateIdeas.tsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; // 👈 ADDED useEffect
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/useToast';
 import { evaluationAPI } from '@/services/api';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+
+// Helper function to get the base API URL (copied from EvaluationForm.tsx logic)
+const getApiUrl = () => {
+  return import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
+};
 
 export default function EvaluateIdeas() {
   const { user, logout } = useAuth();
@@ -29,6 +34,16 @@ export default function EvaluateIdeas() {
 
   const ideas = assignedData?.data?.ideas || [];
 
+  // Logic to pre-select an idea from URL param on first load
+  useEffect(() => {
+    if (selectedIdeaId && ideas.length > 0) {
+      const ideaFromUrl = ideas.find((idea: any) => idea._id === selectedIdeaId);
+      if (ideaFromUrl) {
+        setSelectedIdea(ideaFromUrl);
+      }
+    }
+  }, [selectedIdeaId, ideas]);
+
   const submitMutation = useMutation({
     mutationFn: (data: any) => evaluationAPI.submit(data),
     onSuccess: () => {
@@ -50,6 +65,12 @@ export default function EvaluateIdeas() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedIdea) return;
+    
+    // Add minimum comment length check for consistency
+    if (comments.trim().length < 20) {
+      addToast('Please provide detailed comments (at least 20 characters)', 'warning');
+      return;
+    }
 
     submitMutation.mutate({
       ideaId: selectedIdea._id,
@@ -59,6 +80,11 @@ export default function EvaluateIdeas() {
   };
 
   const averageScore = ((scores.innovation + scores.feasibility + scores.impact + scores.presentation) / 4).toFixed(1);
+
+  // ✅ NEW: Calculate pitch deck URL
+  const apiUrl = getApiUrl();
+  const pitchDeckUrl = selectedIdea?.pitchDeck ? `${apiUrl}/${selectedIdea.pitchDeck}` : null;
+  // END NEW
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
@@ -157,6 +183,47 @@ export default function EvaluateIdeas() {
                     <h3 className="text-sm font-semibold text-gray-400 mb-2">TEAM</h3>
                     <p className="text-white">{selectedIdea.team}</p>
                   </div>
+
+                  {/* ✅ FIXED: Pitch Deck Viewer for Evaluators */}
+                  {pitchDeckUrl && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-400 mb-2">PITCH DECK</h3>
+                      
+                      <div className="mb-3 flex gap-3">
+                        <a 
+                          href={pitchDeckUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="inline-flex items-center px-4 py-2 bg-orange-900/30 text-orange-300 rounded-lg hover:bg-orange-900/50 transition-colors text-sm font-semibold"
+                        >
+                          <span className="mr-2">📄</span>
+                          Open in New Tab
+                        </a>
+                        <a 
+                          href={pitchDeckUrl} 
+                          download
+                          className="inline-flex items-center px-4 py-2 bg-blue-900/30 text-blue-300 rounded-lg hover:bg-blue-900/50 transition-colors text-sm font-semibold"
+                        >
+                          <span className="mr-2">⬇️</span>
+                          Download
+                        </a>
+                      </div>
+
+                      {/* Embedded PDF/PPT Viewer */}
+                      <div className="w-full h-[600px] bg-gray-900 rounded-lg overflow-hidden border border-gray-700">
+                        <iframe
+                          src={pitchDeckUrl}
+                          className="w-full h-full"
+                          title="Pitch Deck"
+                        />
+                      </div>
+
+                      <p className="text-xs text-gray-500 mt-2">
+                        File: {selectedIdea.pitchDeck.split('/').pop()}
+                      </p>
+                    </div>
+                  )}
+                  {/* END FIXED */}
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6 border-t border-gray-700 pt-8">
@@ -199,7 +266,7 @@ export default function EvaluateIdeas() {
                   {/* Comments */}
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Comments
+                      Comments *
                     </label>
                     <textarea
                       value={comments}
@@ -208,17 +275,33 @@ export default function EvaluateIdeas() {
                       className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 transition-colors"
                       placeholder="Provide detailed feedback..."
                       maxLength={1000}
+                      required
                     />
-                    <p className="text-xs text-gray-500 mt-1">{comments.length}/1000</p>
+                    <div className="flex justify-between text-xs mt-1">
+                      <span className="text-gray-500">Minimum 20 characters</span>
+                      <span className={comments.length < 20 ? 'text-yellow-500' : 'text-gray-500'}>
+                        {comments.length}/1000
+                      </span>
+                    </div>
                   </div>
 
                   <button
                     type="submit"
-                    disabled={submitMutation.isPending}
-                    className="w-full py-3 gradient-primary text-white rounded-lg font-semibold hover:opacity-90 transition-all disabled:opacity-50"
+                    disabled={submitMutation.isPending || comments.trim().length < 20}
+                    className="w-full py-3 gradient-primary text-white rounded-lg font-semibold hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {submitMutation.isPending ? 'Submitting...' : 'Submit Evaluation'}
                   </button>
+
+                  {/* Warning for completed evaluations */}
+                  {selectedIdea.evaluationStatus === 'completed' && (
+                    <div className="p-4 bg-yellow-900/20 border border-yellow-700 rounded-lg">
+                      <p className="text-yellow-300 text-sm">
+                        ⚠️ You have already submitted an evaluation for this idea. Submitting again will update your previous evaluation.
+                      </p>
+                    </div>
+                  )}
+
                 </form>
               </div>
             ) : (
